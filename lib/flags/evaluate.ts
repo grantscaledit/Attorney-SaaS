@@ -21,14 +21,22 @@ export function tierIncludes(tier: Tier, flag: FeatureFlag): boolean {
  * Pure flag evaluation. A firm override can switch a tier feature off; it can
  * never switch on a feature the tier does not include.
  */
-export function evaluateFeature(tier: Tier, flag: FeatureFlag, overrides: FlagOverrides = {}): FeatureState {
+export function evaluateFeature(
+  tier: Tier,
+  flag: FeatureFlag,
+  overrides: FlagOverrides = {},
+): FeatureState {
   const inTier = tierIncludes(tier, flag);
   const override = overrides[flag];
   const disabledByFirm = inTier && override === false;
   return { flag, inTier, enabled: inTier && !disabledByFirm, disabledByFirm };
 }
 
-export function isFeatureEnabled(tier: Tier, flag: FeatureFlag, overrides: FlagOverrides = {}): boolean {
+export function isFeatureEnabled(
+  tier: Tier,
+  flag: FeatureFlag,
+  overrides: FlagOverrides = {},
+): boolean {
   return evaluateFeature(tier, flag, overrides).enabled;
 }
 

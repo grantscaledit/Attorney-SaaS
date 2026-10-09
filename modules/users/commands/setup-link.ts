@@ -21,12 +21,22 @@ export function setupLinkUrl(token: string): string {
 export type IssuedSetupLink = { url: string; expiresAt: Date; inviteId: string };
 
 /** Revokes any open links for the user and issues a new one. Runs inside the caller's transaction. */
-export async function issueSetupLink(tx: DbOrTx, userId: string, createdBy: string | null): Promise<IssuedSetupLink> {
+export async function issueSetupLink(
+  tx: DbOrTx,
+  userId: string,
+  createdBy: string | null,
+): Promise<IssuedSetupLink> {
   const now = new Date();
   await tx
     .update(userInvites)
     .set({ revokedAt: now, updatedAt: now })
-    .where(and(eq(userInvites.userId, userId), isNull(userInvites.acceptedAt), isNull(userInvites.revokedAt)));
+    .where(
+      and(
+        eq(userInvites.userId, userId),
+        isNull(userInvites.acceptedAt),
+        isNull(userInvites.revokedAt),
+      ),
+    );
 
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(now.getTime() + AUTH_POLICY.inviteTtlHours * 3600 * 1000);

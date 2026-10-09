@@ -16,7 +16,10 @@ export const auditLog = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     // Placeholder defaults; the trigger always overwrites these three columns.
-    seq: bigint("seq", { mode: "number" }).notNull().unique().default(sql`0`),
+    seq: bigint("seq", { mode: "number" })
+      .notNull()
+      .unique()
+      .default(sql`0`),
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
     actorType: text("actor_type", { enum: AUDIT_ACTOR_TYPES }).notNull(),
     actorId: uuid("actor_id"),

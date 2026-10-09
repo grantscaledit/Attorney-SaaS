@@ -29,17 +29,26 @@ export class FieldCipher {
     cipher.setAAD(Buffer.from(aad, "utf8"));
     const ct = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
     const tag = cipher.getAuthTag();
-    return [VERSION, iv.toString("base64url"), tag.toString("base64url"), ct.toString("base64url")].join(".");
+    return [
+      VERSION,
+      iv.toString("base64url"),
+      tag.toString("base64url"),
+      ct.toString("base64url"),
+    ].join(".");
   }
 
   decrypt(payload: string, aad: string): string {
     const parts = payload.split(".");
-    if (parts.length !== 4 || parts[0] !== VERSION) throw new Error("Unsupported ciphertext format");
+    if (parts.length !== 4 || parts[0] !== VERSION)
+      throw new Error("Unsupported ciphertext format");
     const [, ivB64, tagB64, ctB64] = parts as [string, string, string, string];
     const decipher = createDecipheriv(ALGO, this.key, Buffer.from(ivB64, "base64url"));
     decipher.setAAD(Buffer.from(aad, "utf8"));
     decipher.setAuthTag(Buffer.from(tagB64, "base64url"));
-    return Buffer.concat([decipher.update(Buffer.from(ctB64, "base64url")), decipher.final()]).toString("utf8");
+    return Buffer.concat([
+      decipher.update(Buffer.from(ctB64, "base64url")),
+      decipher.final(),
+    ]).toString("utf8");
   }
 }
 

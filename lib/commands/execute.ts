@@ -68,7 +68,9 @@ export async function execute<S extends z.ZodType, R>(
       .select({ attorneysSeeFinancials: firmSettings.attorneysSeeFinancials })
       .from(firmSettings)
       .where(eq(firmSettings.id, 1));
-    const policy: FirmPolicy = { attorneysSeeFinancials: settings?.attorneysSeeFinancials ?? false };
+    const policy: FirmPolicy = {
+      attorneysSeeFinancials: settings?.attorneysSeeFinancials ?? false,
+    };
 
     const ctx: CommandContext = {
       tx,

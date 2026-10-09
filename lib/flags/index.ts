@@ -10,7 +10,9 @@ export * from "./catalog";
 export * from "./evaluate";
 
 export async function loadFlagOverrides(db: DbOrTx = getDb()): Promise<FlagOverrides> {
-  const rows = await db.select({ key: featureFlags.key, enabled: featureFlags.enabled }).from(featureFlags);
+  const rows = await db
+    .select({ key: featureFlags.key, enabled: featureFlags.enabled })
+    .from(featureFlags);
   const overrides: FlagOverrides = {};
   for (const row of rows) if (isFeatureFlag(row.key)) overrides[row.key] = row.enabled;
   return overrides;

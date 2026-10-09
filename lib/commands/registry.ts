@@ -1,8 +1,14 @@
+import { recordAuditExport } from "@/modules/audit/commands/record-export";
+import { verifyChain } from "@/modules/audit/commands/verify-chain";
 import { bootstrapFirm } from "@/modules/firm/commands/bootstrap";
 import { setFeatureEnabled } from "@/modules/firm/commands/set-feature";
 import { updateFirmSettings } from "@/modules/firm/commands/update-settings";
 import { acceptInvite } from "@/modules/users/commands/accept-invite";
-import { issueUserSetupLink, resetUserMfa, revokeUserSessions } from "@/modules/users/commands/access";
+import {
+  issueUserSetupLink,
+  resetUserMfa,
+  revokeUserSessions,
+} from "@/modules/users/commands/access";
 import { inviteUser } from "@/modules/users/commands/invite";
 import { deactivateUser, reactivateUser } from "@/modules/users/commands/set-status";
 import { updateUser } from "@/modules/users/commands/update";
@@ -24,4 +30,6 @@ export const COMMANDS = [
   resetUserMfa,
   revokeUserSessions,
   acceptInvite,
+  verifyChain,
+  recordAuditExport,
 ] as const satisfies readonly AnyCommand[];

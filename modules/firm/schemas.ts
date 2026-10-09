@@ -21,21 +21,36 @@ export const firmSettingsInput = z.object({
   addressLine1: optionalText(200),
   addressLine2: optionalText(200),
   city: optionalText(100),
-  state: optionalText(2).refine((v) => v === null || /^[A-Z]{2}$/.test(v), "Use the two-letter state code"),
-  postalCode: optionalText(10).refine((v) => v === null || /^\d{5}(-\d{4})?$/.test(v), "Use a 5 or 9 digit ZIP code"),
+  state: optionalText(2).refine(
+    (v) => v === null || /^[A-Z]{2}$/.test(v),
+    "Use the two-letter state code",
+  ),
+  postalCode: optionalText(10).refine(
+    (v) => v === null || /^\d{5}(-\d{4})?$/.test(v),
+    "Use a 5 or 9 digit ZIP code",
+  ),
   phone: optionalText(30),
-  website: optionalText(200).refine((v) => v === null || /^https:\/\/\S+$/.test(v), "Use a full https:// address"),
+  website: optionalText(200).refine(
+    (v) => v === null || /^https:\/\/\S+$/.test(v),
+    "Use a full https:// address",
+  ),
   practiceAreas: z.array(z.enum(PRACTICE_AREAS)).min(1, "Choose at least one practice area"),
   aiDisclosureText: z
     .string()
     .trim()
-    .min(80, "The disclosure must explain AI use, no legal advice, and no attorney-client relationship")
+    .min(
+      80,
+      "The disclosure must explain AI use, no legal advice, and no attorney-client relationship",
+    )
     .max(2000),
   attorneysSeeFinancials: z.boolean(),
   ipAllowlist: z
     .array(z.string().trim().min(1))
     .max(50)
-    .refine((list) => list.every(isValidAllowlistEntry), "Each entry must be an IP address or CIDR range"),
+    .refine(
+      (list) => list.every(isValidAllowlistEntry),
+      "Each entry must be an IP address or CIDR range",
+    ),
 });
 
 export type FirmSettingsInput = z.infer<typeof firmSettingsInput>;

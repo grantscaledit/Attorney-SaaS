@@ -1,4 +1,5 @@
-export type CommandErrorCode = "validation" | "forbidden" | "not_found" | "conflict" | "limit" | "invalid_state";
+export type CommandErrorCode =
+  "validation" | "forbidden" | "not_found" | "conflict" | "limit" | "invalid_state";
 
 /**
  * Expected, user-facing failures. Anything else thrown from a command is a bug

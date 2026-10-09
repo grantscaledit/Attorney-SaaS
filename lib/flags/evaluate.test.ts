@@ -35,12 +35,35 @@ describe("tier gating", () => {
   });
 
   it("Solo: intake all except A4; revenue D1-D3; marketing F1, F3; executive G1-G3, G7", () => {
-    const soloAutomations = FEATURE_FLAGS.filter((f) => f.startsWith("automation.") && isFeatureEnabled("solo", f))
+    const soloAutomations = FEATURE_FLAGS.filter(
+      (f) => f.startsWith("automation.") && isFeatureEnabled("solo", f),
+    )
       .map((f) => f.replace("automation.", ""))
       .filter((id) => /^[ADFG]/.test(id))
       .sort();
     expect(soloAutomations).toEqual(
-      ["A1", "A10", "A11", "A12", "A2", "A3", "A5", "A6", "A7", "A8", "A9", "D1", "D2", "D3", "F1", "F3", "G1", "G2", "G3", "G7"].sort(),
+      [
+        "A1",
+        "A10",
+        "A11",
+        "A12",
+        "A2",
+        "A3",
+        "A5",
+        "A6",
+        "A7",
+        "A8",
+        "A9",
+        "D1",
+        "D2",
+        "D3",
+        "F1",
+        "F3",
+        "G1",
+        "G2",
+        "G3",
+        "G7",
+      ].sort(),
     );
   });
 
@@ -58,7 +81,12 @@ describe("tier gating", () => {
 describe("firm overrides", () => {
   it("can switch off a feature the tier includes", () => {
     const s = evaluateFeature("solo", "automation.A1", { "automation.A1": false });
-    expect(s).toEqual({ flag: "automation.A1", inTier: true, enabled: false, disabledByFirm: true });
+    expect(s).toEqual({
+      flag: "automation.A1",
+      inTier: true,
+      enabled: false,
+      disabledByFirm: true,
+    });
   });
 
   it("cannot switch on a feature outside the tier", () => {

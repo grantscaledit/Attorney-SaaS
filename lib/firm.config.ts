@@ -53,7 +53,8 @@ let cachedAllowlist: { value: readonly string[]; at: number } | undefined;
 const ALLOWLIST_TTL_MS = 30_000;
 
 export async function getIpAllowlist(): Promise<readonly string[]> {
-  if (cachedAllowlist && Date.now() - cachedAllowlist.at < ALLOWLIST_TTL_MS) return cachedAllowlist.value;
+  if (cachedAllowlist && Date.now() - cachedAllowlist.at < ALLOWLIST_TTL_MS)
+    return cachedAllowlist.value;
   const settings = await loadFirmSettings();
   cachedAllowlist = { value: settings.ipAllowlist, at: Date.now() };
   return cachedAllowlist.value;

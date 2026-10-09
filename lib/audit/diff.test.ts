@@ -11,7 +11,9 @@ describe("diffSnapshots", () => {
   });
 
   it("treats a create (null before) as all fields added", () => {
-    expect(diffSnapshots(null, { name: "A" })).toEqual([{ field: "name", before: null, after: "A" }]);
+    expect(diffSnapshots(null, { name: "A" })).toEqual([
+      { field: "name", before: null, after: "A" },
+    ]);
   });
 
   it("returns nothing for identical snapshots", () => {

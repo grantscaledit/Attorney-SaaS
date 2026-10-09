@@ -19,7 +19,10 @@ export const updateUser = defineCommand({
     const roleChanged = before.role !== input.role;
     if (roleChanged) {
       if (ctx.principal.type === "user" && ctx.principal.user.id === before.id) {
-        throw new CommandError("invalid_state", "You cannot change your own role. Ask another owner attorney.");
+        throw new CommandError(
+          "invalid_state",
+          "You cannot change your own role. Ask another owner attorney.",
+        );
       }
       if (before.role === "owner_attorney") await assertNotLastOwner(ctx.tx, before);
     }

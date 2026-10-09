@@ -14,7 +14,7 @@ import { ADMIN_URL, dbUrl } from "./db-names";
 export const TEST_REQUEST = { ip: "203.0.113.10", userAgent: "vitest", requestId: "test-request" };
 
 /** Clones the migrated template into a new database for this test file and points the app at it. */
-export function useFreshDatabase(): { db: () => Database; url: () => string } {
+export function withFreshDatabase(): { db: () => Database; url: () => string } {
   let name = "";
   beforeAll(async () => {
     name = `lexdesk_it_${randomBytes(6).toString("hex")}`;
@@ -40,7 +40,9 @@ export function asUser(user: SessionUser): Principal {
 
 /** Run a command without fighting its generic types (tests only). */
 export function run(command: AnyCommand, principal: Principal, input: unknown): Promise<unknown> {
-  return execute(command as unknown as Command<z.ZodType, unknown>, principal, input, { request: TEST_REQUEST });
+  return execute(command as unknown as Command<z.ZodType, unknown>, principal, input, {
+    request: TEST_REQUEST,
+  });
 }
 
 export async function provisionTestFirm(): Promise<{ owner: SessionUser; setupUrl: string }> {
@@ -54,7 +56,13 @@ export async function provisionTestFirm(): Promise<{ owner: SessionUser; setupUr
   // Tests act as an enrolled owner; MFA enrollment itself is covered in auth.test.ts.
   await getDb().update(users).set({ twoFactorEnabled: true }).where(eq(users.id, result.ownerId));
   return {
-    owner: { id: result.ownerId, email: "owner@test-firm.example", name: "Olivia Owner", role: "owner_attorney", status: "active" },
+    owner: {
+      id: result.ownerId,
+      email: "owner@test-firm.example",
+      name: "Olivia Owner",
+      role: "owner_attorney",
+      status: "active",
+    },
     setupUrl: result.setupUrl,
   };
 }

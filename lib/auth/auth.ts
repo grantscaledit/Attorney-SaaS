@@ -50,7 +50,13 @@ function createAuth() {
     trustedOrigins: [e.APP_URL],
     database: drizzleAdapter(getDb(), {
       provider: "pg",
-      schema: { user: users, session: sessions, account: accounts, verification: verifications, twoFactor: twoFactors },
+      schema: {
+        user: users,
+        session: sessions,
+        account: accounts,
+        verification: verifications,
+        twoFactor: twoFactors,
+      },
     }),
     disabledPaths: DISABLED_PATHS,
     emailAndPassword: {
@@ -96,7 +102,11 @@ function createAuth() {
       twoFactor({
         issuer: "LexDesk",
         totpOptions: { digits: 6, period: 30 },
-        backupCodeOptions: { amount: AUTH_POLICY.backupCodeCount, length: 10, storeBackupCodes: "encrypted" },
+        backupCodeOptions: {
+          amount: AUTH_POLICY.backupCodeCount,
+          length: 10,
+          storeBackupCodes: "encrypted",
+        },
         accountLockout: { enabled: true, maxFailedAttempts: 10, durationSeconds: 15 * 60 },
       }),
       // Must stay last: lets server actions set auth cookies.
@@ -123,7 +133,9 @@ function createAuth() {
 
         if (ctx.path === "/sign-in/email") {
           if (!isIpAllowed(ip, await getIpAllowlist())) {
-            throw new APIError("FORBIDDEN", { message: "Sign-in is not allowed from this network." });
+            throw new APIError("FORBIDDEN", {
+              message: "Sign-in is not allowed from this network.",
+            });
           }
           const email = (ctx.body as { email?: unknown } | undefined)?.email;
           if (typeof email === "string") {
@@ -132,20 +144,29 @@ function createAuth() {
               .from(users)
               .where(eq(users.email, email.toLowerCase()));
             if (u && (u.status !== "active" || u.deletedAt)) {
-              throw new APIError("UNAUTHORIZED", { message: INVALID_CREDENTIALS, code: "INVALID_EMAIL_OR_PASSWORD" });
+              throw new APIError("UNAUTHORIZED", {
+                message: INVALID_CREDENTIALS,
+                code: "INVALID_EMAIL_OR_PASSWORD",
+              });
             }
           }
         }
 
         // Resolve the session up front so the after hook knows who signed out or
         // whether a TOTP verification is an enrollment (existing session) or a sign-in.
-        if (ctx.path === "/sign-out" || ctx.path.startsWith("/two-factor/") || ctx.path.startsWith("/revoke")) {
+        if (
+          ctx.path === "/sign-out" ||
+          ctx.path.startsWith("/two-factor/") ||
+          ctx.path.startsWith("/revoke")
+        ) {
           await getSessionFromCtx(ctx).catch(() => null);
         }
       }),
       after: createAuthMiddleware(async (ctx) => {
-        const sessionUser = ctx.context.session?.user as { id: string; email: string; twoFactorEnabled?: boolean } | undefined;
-        const newSessionUser = ctx.context.newSession?.user as { id: string; email: string; twoFactorEnabled?: boolean } | undefined;
+        const sessionUser = ctx.context.session?.user as
+          { id: string; email: string; twoFactorEnabled?: boolean } | undefined;
+        const newSessionUser = ctx.context.newSession?.user as
+          { id: string; email: string; twoFactorEnabled?: boolean } | undefined;
         await recordAuthEvent({
           path: ctx.path,
           returned: ctx.context.returned,

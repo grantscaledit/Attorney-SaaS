@@ -7,7 +7,14 @@ import { COMMANDS } from "@/lib/commands/registry";
 import { inviteUser } from "@/modules/users/commands/invite";
 import { updateFirmSettings } from "@/modules/firm/commands/update-settings";
 import { DEFAULT_AI_DISCLOSURE } from "@/modules/firm/schemas";
-import { SYSTEM, asUser, provisionTestFirm, run, tokenFromSetupUrl, useFreshDatabase } from "./helpers";
+import {
+  SYSTEM,
+  asUser,
+  provisionTestFirm,
+  run,
+  tokenFromSetupUrl,
+  withFreshDatabase,
+} from "./helpers";
 
 /*
  * Phase 0 acceptance criterion: "Every mutation appears in the audit log."
@@ -19,7 +26,7 @@ import { SYSTEM, asUser, provisionTestFirm, run, tokenFromSetupUrl, useFreshData
 
 // Firm tier so the fixtures are not limited by the Solo seat cap (tested in users.test.ts).
 process.env.FIRM_TIER = "firm";
-const { db } = useFreshDatabase();
+const { db } = withFreshDatabase();
 
 let owner: SessionUser;
 let ownerSetupUrl: string;
@@ -33,7 +40,11 @@ type Fixture = {
 };
 
 async function makeStaff(email: string): Promise<string> {
-  const r = (await run(inviteUser, asUser(owner), { name: "Staff Member", email, role: "paralegal" })) as { userId: string };
+  const r = (await run(inviteUser, asUser(owner), {
+    name: "Staff Member",
+    email,
+    role: "paralegal",
+  })) as { userId: string };
   return r.userId;
 }
 
@@ -63,12 +74,20 @@ const FIXTURES: Record<string, Fixture> = {
   },
   "users.invite": {
     principal: () => asUser(owner),
-    input: () => ({ name: "New Paralegal", email: "fixture.invite@test-firm.example", role: "paralegal" }),
+    input: () => ({
+      name: "New Paralegal",
+      email: "fixture.invite@test-firm.example",
+      role: "paralegal",
+    }),
     expectAction: "users.invited",
   },
   "users.update": {
     principal: () => asUser(owner),
-    input: async () => ({ userId: await makeStaff("fixture.update@test-firm.example"), name: "Renamed", role: "intake" }),
+    input: async () => ({
+      userId: await makeStaff("fixture.update@test-firm.example"),
+      name: "Renamed",
+      role: "intake",
+    }),
     expectAction: "users.role_changed",
   },
   "users.deactivate": {
@@ -79,7 +98,10 @@ const FIXTURES: Record<string, Fixture> = {
   "users.reactivate": {
     principal: () => asUser(owner),
     input: async () => {
-      const [u] = await db().select({ id: users.id }).from(users).where(eq(users.email, "fixture.deactivate@test-firm.example"));
+      const [u] = await db()
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, "fixture.deactivate@test-firm.example"));
       return { userId: u!.id };
     },
     expectAction: "users.reactivated",
@@ -108,6 +130,16 @@ const FIXTURES: Record<string, Fixture> = {
     }),
     expectAction: "users.invite_accepted",
   },
+  "audit.verify_chain": {
+    principal: () => asUser(owner),
+    input: () => ({}),
+    expectAction: "audit.chain_verified",
+  },
+  "audit.export": {
+    principal: () => asUser(owner),
+    input: () => ({ filters: { actor: "user" }, format: "csv" }),
+    expectAction: "audit.exported",
+  },
 };
 
 describe("every command writes an audit row", () => {
@@ -126,9 +158,17 @@ describe("every command writes an audit row", () => {
 
     it(`${command.name} -> ${fixture.expectAction}`, async () => {
       const input = await fixture.input();
-      const [head] = await db().select({ seq: auditLog.seq }).from(auditLog).orderBy(desc(auditLog.seq)).limit(1);
+      const [head] = await db()
+        .select({ seq: auditLog.seq })
+        .from(auditLog)
+        .orderBy(desc(auditLog.seq))
+        .limit(1);
       await run(command, fixture.principal(), input);
-      const rows = await db().select().from(auditLog).where(gt(auditLog.seq, head?.seq ?? 0)).orderBy(auditLog.seq);
+      const rows = await db()
+        .select()
+        .from(auditLog)
+        .where(gt(auditLog.seq, head?.seq ?? 0))
+        .orderBy(auditLog.seq);
       const row = rows.find((r) => r.action === fixture.expectAction);
       expect(row, `no ${fixture.expectAction} row`).toBeDefined();
       expect(row!.actorType).not.toBeNull();
@@ -146,22 +186,48 @@ describe("every command writes an audit row", () => {
 
 describe("denials and failures", () => {
   it("audits a permission denial and changes nothing", async () => {
-    const intake: SessionUser = { id: owner.id, email: "intake@test-firm.example", name: "I", role: "intake", status: "active" };
+    const intake: SessionUser = {
+      id: owner.id,
+      email: "intake@test-firm.example",
+      name: "I",
+      role: "intake",
+      status: "active",
+    };
     await expect(
-      run(inviteUser, asUser(intake), { name: "Nope", email: "denied@test-firm.example", role: "paralegal" }),
+      run(inviteUser, asUser(intake), {
+        name: "Nope",
+        email: "denied@test-firm.example",
+        role: "paralegal",
+      }),
     ).rejects.toMatchObject({ code: "forbidden" });
     const [row] = await db().select().from(auditLog).orderBy(desc(auditLog.seq)).limit(1);
-    expect(row).toMatchObject({ action: "access.denied", metadata: { command: "users.invite", permission: "users.invite" } });
-    const created = await db().select().from(users).where(eq(users.email, "denied@test-firm.example"));
+    expect(row).toMatchObject({
+      action: "access.denied",
+      metadata: { command: "users.invite", permission: "users.invite" },
+    });
+    const created = await db()
+      .select()
+      .from(users)
+      .where(eq(users.email, "denied@test-firm.example"));
     expect(created).toHaveLength(0);
   });
 
   it("rejects invalid input before touching the database", async () => {
-    const before = await db().select({ seq: auditLog.seq }).from(auditLog).orderBy(desc(auditLog.seq)).limit(1);
-    const err = await run(updateFirmSettings, asUser(owner), { legalName: "" }).catch((e: unknown) => e);
+    const before = await db()
+      .select({ seq: auditLog.seq })
+      .from(auditLog)
+      .orderBy(desc(auditLog.seq))
+      .limit(1);
+    const err = await run(updateFirmSettings, asUser(owner), { legalName: "" }).catch(
+      (e: unknown) => e,
+    );
     expect(err).toBeInstanceOf(CommandError);
     expect((err as CommandError).fieldErrors?.legalName).toBeDefined();
-    const after = await db().select({ seq: auditLog.seq }).from(auditLog).orderBy(desc(auditLog.seq)).limit(1);
+    const after = await db()
+      .select({ seq: auditLog.seq })
+      .from(auditLog)
+      .orderBy(desc(auditLog.seq))
+      .limit(1);
     expect(after[0]!.seq).toBe(before[0]!.seq);
   });
 

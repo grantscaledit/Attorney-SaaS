@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 
 // Environment for an integration test worker. DATABASE_URL is set per file by
-// useFreshDatabase(); everything else is fixed test configuration.
+// withFreshDatabase(); everything else is fixed test configuration.
 process.env.FIRM_SLUG ??= "test-firm";
 process.env.FIRM_TIER ??= "solo";
 process.env.FIRM_TIMEZONE ??= "America/Chicago";

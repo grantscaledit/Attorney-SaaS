@@ -2,6 +2,9 @@ import "server-only";
 import { headers } from "next/headers";
 import { forbidden, redirect } from "next/navigation";
 import { cache } from "react";
+import { getDb } from "@/db/client";
+import { recordAudit } from "@/lib/audit/record";
+import { log } from "@/lib/log";
 import { getRequestMeta } from "@/lib/request-context";
 import { loadFirmSettings } from "@/lib/firm.config";
 import { getAuth } from "./auth";
@@ -39,10 +42,15 @@ export const getRawSession = cache(async () => {
   return getAuth().api.getSession({ headers: await headers() });
 });
 
-const loadPolicy = cache(async (): Promise<{ policy: FirmPolicy; ipAllowlist: readonly string[] }> => {
-  const s = await loadFirmSettings();
-  return { policy: { attorneysSeeFinancials: s.attorneysSeeFinancials }, ipAllowlist: s.ipAllowlist };
-});
+const loadPolicy = cache(
+  async (): Promise<{ policy: FirmPolicy; ipAllowlist: readonly string[] }> => {
+    const s = await loadFirmSettings();
+    return {
+      policy: { attorneysSeeFinancials: s.attorneysSeeFinancials },
+      ipAllowlist: s.ipAllowlist,
+    };
+  },
+);
 
 function toCurrentUser(u: RawSessionUser): CurrentUser | null {
   if (!isRole(u.role)) return null;
@@ -101,9 +109,21 @@ export async function requireUser(options: RequireOptions = {}): Promise<Current
 }
 
 /** requireUser plus a permission check; renders the 403 page when denied. */
-export async function requirePermission(action: Action, ctx: Omit<CanContext, "policy"> = {}): Promise<CurrentSession> {
+export async function requirePermission(
+  action: Action,
+  ctx: Omit<CanContext, "policy"> = {},
+): Promise<CurrentSession> {
   const session = await requireSession();
-  if (!can(session.user, action, { ...ctx, policy: session.policy })) forbidden();
+  if (!can(session.user, action, { ...ctx, policy: session.policy })) {
+    // Attempts to reach a page outside one's role are security-relevant: record them.
+    await recordAudit(getDb(), {
+      actor: { type: "user", id: session.user.id, label: session.user.email },
+      action: "access.denied",
+      metadata: { permission: action, via: "page" },
+      request: await getRequestMeta(),
+    }).catch((err: unknown) => log.error("failed to audit page denial", { err }));
+    forbidden();
+  }
   return session;
 }
 

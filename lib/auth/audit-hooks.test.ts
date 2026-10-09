@@ -35,13 +35,26 @@ describe("auditForAuthEvent", () => {
   });
 
   it("records a first sign-in (MFA not yet enrolled) as pending enrollment", () => {
-    const e = auditForAuthEvent({ ...base, returned: { token: "t" }, newSessionUser: { ...user, twoFactorEnabled: false } });
+    const e = auditForAuthEvent({
+      ...base,
+      returned: { token: "t" },
+      newSessionUser: { ...user, twoFactorEnabled: false },
+    });
     expect(e).toMatchObject({ action: "auth.signed_in", metadata: { mfa: "pending_enrollment" } });
   });
 
   it("records sign-in completion after TOTP", () => {
-    const e = auditForAuthEvent({ ...base, path: "/two-factor/verify-totp", returned: { token: "x" }, newSessionUser: user });
-    expect(e).toMatchObject({ action: "auth.signed_in", actor: { type: "user", id: "u1" }, metadata: { mfa: "totp" } });
+    const e = auditForAuthEvent({
+      ...base,
+      path: "/two-factor/verify-totp",
+      returned: { token: "x" },
+      newSessionUser: user,
+    });
+    expect(e).toMatchObject({
+      action: "auth.signed_in",
+      actor: { type: "user", id: "u1" },
+      metadata: { mfa: "totp" },
+    });
   });
 
   it("records MFA enrollment when the first code is verified on an un-enrolled session", () => {
@@ -55,20 +68,36 @@ describe("auditForAuthEvent", () => {
   });
 
   it("records failed MFA codes", () => {
-    const e = auditForAuthEvent({ ...base, path: "/two-factor/verify-totp", returned: apiError("INVALID_CODE") });
+    const e = auditForAuthEvent({
+      ...base,
+      path: "/two-factor/verify-totp",
+      returned: apiError("INVALID_CODE"),
+    });
     expect(e?.action).toBe("auth.mfa_failed");
   });
 
   it("records sign-out and session revocation", () => {
-    expect(auditForAuthEvent({ ...base, path: "/sign-out", returned: { success: true }, sessionUser: user })?.action).toBe(
-      "auth.signed_out",
-    );
     expect(
-      auditForAuthEvent({ ...base, path: "/revoke-other-sessions", returned: { status: true }, sessionUser: user })?.action,
+      auditForAuthEvent({
+        ...base,
+        path: "/sign-out",
+        returned: { success: true },
+        sessionUser: user,
+      })?.action,
+    ).toBe("auth.signed_out");
+    expect(
+      auditForAuthEvent({
+        ...base,
+        path: "/revoke-other-sessions",
+        returned: { status: true },
+        sessionUser: user,
+      })?.action,
     ).toBe("auth.other_sessions_revoked");
   });
 
   it("ignores read-only endpoints", () => {
-    expect(auditForAuthEvent({ ...base, path: "/get-session", returned: {}, sessionUser: user })).toBeNull();
+    expect(
+      auditForAuthEvent({ ...base, path: "/get-session", returned: {}, sessionUser: user }),
+    ).toBeNull();
   });
 });

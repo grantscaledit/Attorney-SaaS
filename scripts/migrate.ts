@@ -13,7 +13,9 @@ if (!url) {
 const started = Date.now();
 runMigrations(url)
   .then(() => {
-    console.log(JSON.stringify({ level: "info", msg: "migrations applied", ms: Date.now() - started }));
+    console.log(
+      JSON.stringify({ level: "info", msg: "migrations applied", ms: Date.now() - started }),
+    );
   })
   .catch((err: unknown) => {
     console.error(err);

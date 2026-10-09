@@ -23,7 +23,11 @@ export const setFeatureEnabled = defineCommand({
     if (!tierIncludes(ctx.tier, input.flag)) {
       throw new CommandError("invalid_state", "This feature is not included in the firm's plan.");
     }
-    const [existing] = await ctx.tx.select().from(featureFlags).where(eq(featureFlags.key, input.flag)).for("update");
+    const [existing] = await ctx.tx
+      .select()
+      .from(featureFlags)
+      .where(eq(featureFlags.key, input.flag))
+      .for("update");
     const beforeEnabled = existing ? existing.enabled : true;
     if (beforeEnabled === input.enabled) {
       throw new CommandError("invalid_state", `Already ${input.enabled ? "on" : "off"}.`);

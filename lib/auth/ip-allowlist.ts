@@ -5,7 +5,9 @@ import { BlockList, isIP } from "node:net";
  * Entries are single addresses or CIDR ranges, IPv4 or IPv6. An empty list
  * allows every address.
  */
-export function parseAllowlistEntry(entry: string): { address: string; prefix: number; family: "ipv4" | "ipv6" } | null {
+export function parseAllowlistEntry(
+  entry: string,
+): { address: string; prefix: number; family: "ipv4" | "ipv6" } | null {
   const [address, prefixRaw] = entry.trim().split("/");
   if (!address) return null;
   const version = isIP(address);

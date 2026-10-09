@@ -53,7 +53,9 @@ function attemptedEmail(body: unknown): string | null {
 }
 
 /** Pure mapping from an auth endpoint outcome to an audit entry (unit-tested). */
-export function auditForAuthEvent(input: AuthHookInput): { action: string; actor: AuditActor; metadata?: Record<string, unknown> } | null {
+export function auditForAuthEvent(
+  input: AuthHookInput,
+): { action: string; actor: AuditActor; metadata?: Record<string, unknown> } | null {
   const failed = isErrorResult(input.returned);
   const user = input.newSessionUser ?? input.sessionUser;
   const actor: AuditActor = user
@@ -73,8 +75,15 @@ export function auditForAuthEvent(input: AuthHookInput): { action: string; actor
   // app confines the session to MFA enrollment.
   if (input.path === "/sign-in/email") {
     const r = input.returned as { twoFactorRedirect?: boolean } | null;
-    if (r?.twoFactorRedirect || user?.twoFactorEnabled) return { action: "auth.password_verified", actor };
-    return user ? { action: "auth.signed_in", actor, metadata: { method: "password", mfa: "pending_enrollment" } } : null;
+    if (r?.twoFactorRedirect || user?.twoFactorEnabled)
+      return { action: "auth.password_verified", actor };
+    return user
+      ? {
+          action: "auth.signed_in",
+          actor,
+          metadata: { method: "password", mfa: "pending_enrollment" },
+        }
+      : null;
   }
 
   if (input.path === "/two-factor/verify-totp" || input.path === "/two-factor/verify-backup-code") {

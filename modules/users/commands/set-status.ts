@@ -3,7 +3,12 @@ import { z } from "zod";
 import { sessions, users } from "@/db/schema";
 import { defineCommand } from "@/lib/commands/define";
 import { CommandError } from "@/lib/commands/errors";
-import { assertNotLastOwner, assertSeatAvailable, loadUserForUpdate, userSnapshot } from "../guards";
+import {
+  assertNotLastOwner,
+  assertSeatAvailable,
+  loadUserForUpdate,
+  userSnapshot,
+} from "../guards";
 import { userId } from "../schemas";
 
 export const deactivateUser = defineCommand({
@@ -15,7 +20,8 @@ export const deactivateUser = defineCommand({
     if (ctx.principal.type === "user" && ctx.principal.user.id === before.id) {
       throw new CommandError("invalid_state", "You cannot deactivate your own account.");
     }
-    if (before.status === "disabled") throw new CommandError("invalid_state", "That user is already deactivated.");
+    if (before.status === "disabled")
+      throw new CommandError("invalid_state", "That user is already deactivated.");
     await assertNotLastOwner(ctx.tx, before);
 
     const [after] = await ctx.tx
@@ -25,7 +31,10 @@ export const deactivateUser = defineCommand({
       .returning();
     if (!after) throw new Error("update returned no row");
     // Immediate effect: end every session the user holds.
-    const ended = await ctx.tx.delete(sessions).where(eq(sessions.userId, before.id)).returning({ id: sessions.id });
+    const ended = await ctx.tx
+      .delete(sessions)
+      .where(eq(sessions.userId, before.id))
+      .returning({ id: sessions.id });
 
     return {
       result: { userId: after.id },
@@ -49,7 +58,8 @@ export const reactivateUser = defineCommand({
   input: z.object({ userId }),
   async run(ctx, input) {
     const before = await loadUserForUpdate(ctx.tx, input.userId);
-    if (before.status === "active") throw new CommandError("invalid_state", "That user is already active.");
+    if (before.status === "active")
+      throw new CommandError("invalid_state", "That user is already active.");
     await assertSeatAvailable(ctx.tx, ctx.tier);
 
     const [after] = await ctx.tx

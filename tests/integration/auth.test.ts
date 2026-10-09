@@ -7,7 +7,7 @@ import type { SessionUser } from "@/lib/commands/define";
 import { acceptInvite } from "@/modules/users/commands/accept-invite";
 import { inviteUser } from "@/modules/users/commands/invite";
 import { deactivateUser } from "@/modules/users/commands/set-status";
-import { asUser, provisionTestFirm, run, tokenFromSetupUrl, useFreshDatabase } from "./helpers";
+import { asUser, provisionTestFirm, run, tokenFromSetupUrl, withFreshDatabase } from "./helpers";
 
 /*
  * End-to-end auth through Better Auth's real request handler: invite, password,
@@ -15,7 +15,7 @@ import { asUser, provisionTestFirm, run, tokenFromSetupUrl, useFreshDatabase } f
  * audit trail each step leaves.
  */
 
-const { db } = useFreshDatabase();
+const { db } = withFreshDatabase();
 const ORIGIN = "http://localhost:3000";
 const PASSWORD = "a perfectly serviceable passphrase";
 
@@ -23,11 +23,19 @@ class Browser {
   private jar = new Map<string, string>();
 
   async call(path: string, body?: unknown, method = body === undefined ? "GET" : "POST") {
-    const headers = new Headers({ origin: ORIGIN, "x-forwarded-for": "198.51.100.20", "user-agent": "vitest-browser" });
+    const headers = new Headers({
+      origin: ORIGIN,
+      "x-forwarded-for": "198.51.100.20",
+      "user-agent": "vitest-browser",
+    });
     if (body !== undefined) headers.set("content-type", "application/json");
     if (this.jar.size) headers.set("cookie", [...this.jar].map(([k, v]) => `${k}=${v}`).join("; "));
     const res = await getAuth().handler(
-      new Request(`${ORIGIN}/api/auth${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) }),
+      new Request(`${ORIGIN}/api/auth${path}`, {
+        method,
+        headers,
+        body: body === undefined ? undefined : JSON.stringify(body),
+      }),
     );
     for (const c of res.headers.getSetCookie()) {
       const [pair, ...attrs] = c.split(";");
@@ -59,7 +67,11 @@ async function auditSince(seq: number) {
 }
 
 async function headSeq(): Promise<number> {
-  const [row] = await db().select({ seq: auditLog.seq }).from(auditLog).orderBy(desc(auditLog.seq)).limit(1);
+  const [row] = await db()
+    .select({ seq: auditLog.seq })
+    .from(auditLog)
+    .orderBy(desc(auditLog.seq))
+    .limit(1);
   return row?.seq ?? 0;
 }
 
@@ -70,26 +82,44 @@ let totpUri: string;
 beforeAll(async () => {
   ({ owner } = await provisionTestFirm());
   paralegalEmail = "para@test-firm.example";
-  const { setupUrl } = (await run(inviteUser, asUser(owner), { name: "Pat Paralegal", email: paralegalEmail, role: "paralegal" })) as {
+  const { setupUrl } = (await run(inviteUser, asUser(owner), {
+    name: "Pat Paralegal",
+    email: paralegalEmail,
+    role: "paralegal",
+  })) as {
     setupUrl: string;
   };
-  await run(acceptInvite, { type: "anonymous" }, { token: tokenFromSetupUrl(setupUrl), password: PASSWORD, confirmPassword: PASSWORD });
+  await run(
+    acceptInvite,
+    { type: "anonymous" },
+    { token: tokenFromSetupUrl(setupUrl), password: PASSWORD, confirmPassword: PASSWORD },
+  );
 });
 
 describe("sign-in and mandatory MFA enrollment", () => {
   it("rejects a wrong password and audits the attempt without the password", async () => {
     const seq = await headSeq();
-    const res = await new Browser().call("/sign-in/email", { email: paralegalEmail, password: "wrong password here" });
+    const res = await new Browser().call("/sign-in/email", {
+      email: paralegalEmail,
+      password: "wrong password here",
+    });
     expect(res.status).toBe(401);
     const rows = await auditSince(seq);
     expect(rows.map((r) => r.action)).toEqual(["auth.sign_in_failed"]);
-    expect(rows[0]).toMatchObject({ actorType: "anonymous", actorLabel: paralegalEmail, ip: "198.51.100.20" });
+    expect(rows[0]).toMatchObject({
+      actorType: "anonymous",
+      actorLabel: paralegalEmail,
+      ip: "198.51.100.20",
+    });
     expect(JSON.stringify(rows)).not.toContain("wrong password");
   });
 
   it("first sign-in creates a session that must enroll TOTP, then enrollment completes MFA", async () => {
     const browser = new Browser();
-    const signIn = await browser.call("/sign-in/email", { email: paralegalEmail, password: PASSWORD });
+    const signIn = await browser.call("/sign-in/email", {
+      email: paralegalEmail,
+      password: PASSWORD,
+    });
     expect(signIn.status).toBe(200);
     expect(signIn.json?.twoFactorRedirect).toBeUndefined();
 
@@ -122,7 +152,10 @@ describe("sign-in and mandatory MFA enrollment", () => {
   it("subsequent sign-ins require the TOTP code before any session exists", async () => {
     const browser = new Browser();
     const seq = await headSeq();
-    const signIn = await browser.call("/sign-in/email", { email: paralegalEmail, password: PASSWORD });
+    const signIn = await browser.call("/sign-in/email", {
+      email: paralegalEmail,
+      password: PASSWORD,
+    });
     expect(signIn.json?.twoFactorRedirect).toBe(true);
     expect((await browser.call("/get-session")).json).toBeNull();
 
@@ -140,14 +173,20 @@ describe("sign-in and mandatory MFA enrollment", () => {
     const out = await browser.call("/sign-out", {});
     expect(out.status).toBe(200);
     expect((await browser.call("/get-session")).json).toBeNull();
-    expect((await auditSince(seq)).at(-1)).toMatchObject({ action: "auth.signed_out", actorType: "user" });
+    expect((await auditSince(seq)).at(-1)).toMatchObject({
+      action: "auth.signed_out",
+      actorType: "user",
+    });
   });
 
   it("sessions expire after 30 minutes idle", async () => {
     const browser = new Browser();
     await browser.call("/sign-in/email", { email: paralegalEmail, password: PASSWORD });
     await browser.call("/two-factor/verify-totp", { code: totpFrom(totpUri) });
-    const s = (await browser.call("/get-session")).json?.session as { expiresAt: string; createdAt: string };
+    const s = (await browser.call("/get-session")).json?.session as {
+      expiresAt: string;
+      createdAt: string;
+    };
     const lifetimeMs = new Date(s.expiresAt).getTime() - Date.now();
     expect(lifetimeMs).toBeGreaterThan(29 * 60_000);
     expect(lifetimeMs).toBeLessThanOrEqual(30 * 60_000);
@@ -161,10 +200,17 @@ describe("account controls", () => {
       email: "leaving@test-firm.example",
       role: "intake",
     })) as { setupUrl: string; userId: string };
-    await run(acceptInvite, { type: "anonymous" }, { token: tokenFromSetupUrl(setupUrl), password: PASSWORD, confirmPassword: PASSWORD });
+    await run(
+      acceptInvite,
+      { type: "anonymous" },
+      { token: tokenFromSetupUrl(setupUrl), password: PASSWORD, confirmPassword: PASSWORD },
+    );
     await run(deactivateUser, asUser(owner), { userId });
 
-    const res = await new Browser().call("/sign-in/email", { email: "leaving@test-firm.example", password: PASSWORD });
+    const res = await new Browser().call("/sign-in/email", {
+      email: "leaving@test-firm.example",
+      password: PASSWORD,
+    });
     expect(res.status).toBe(401);
     expect(res.json?.code).toBe("INVALID_EMAIL_OR_PASSWORD");
   });
@@ -180,9 +226,14 @@ describe("account controls", () => {
   it("IP allowlist blocks sign-in from other networks", async () => {
     const { firmSettings } = await import("@/db/schema");
     const { invalidateFirmCaches } = await import("@/lib/firm.config");
-    await db().update(firmSettings).set({ ipAllowlist: ["203.0.113.0/24"] });
+    await db()
+      .update(firmSettings)
+      .set({ ipAllowlist: ["203.0.113.0/24"] });
     invalidateFirmCaches();
-    const res = await new Browser().call("/sign-in/email", { email: paralegalEmail, password: PASSWORD });
+    const res = await new Browser().call("/sign-in/email", {
+      email: paralegalEmail,
+      password: PASSWORD,
+    });
     expect(res.status).toBe(403);
     await db().update(firmSettings).set({ ipAllowlist: [] });
     invalidateFirmCaches();

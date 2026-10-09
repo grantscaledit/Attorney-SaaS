@@ -27,7 +27,10 @@ export const envSchema = z
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     FIRM_SLUG: z
       .string()
-      .regex(/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/, "lowercase letters, digits and hyphens, 3-40 chars"),
+      .regex(
+        /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/,
+        "lowercase letters, digits and hyphens, 3-40 chars",
+      ),
     FIRM_TIER: z.enum(TIERS),
     FIRM_TIMEZONE: z.string().refine(isValidTimeZone, "must be a valid IANA time zone"),
     DEMO_MODE: booleanFromString,
@@ -55,7 +58,8 @@ export const envSchema = z
         message: "DEMO_MODE=true cannot be combined with GHL credentials",
       });
     }
-    if (env.NODE_ENV === "production" && !env.APP_URL.startsWith("https://")) {
+    const local = ["localhost", "127.0.0.1"].includes(new URL(env.APP_URL).hostname);
+    if (env.NODE_ENV === "production" && !env.APP_URL.startsWith("https://") && !local) {
       ctx.addIssue({ code: "custom", path: ["APP_URL"], message: "must be https in production" });
     }
   });

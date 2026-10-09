@@ -23,10 +23,16 @@ export const firmSettings = pgTable(
     postalCode: text("postal_code"),
     phone: text("phone"),
     website: text("website"),
-    practiceAreas: text("practice_areas", { enum: PRACTICE_AREAS }).array().notNull().default(sql`'{}'`),
+    practiceAreas: text("practice_areas", { enum: PRACTICE_AREAS })
+      .array()
+      .notNull()
+      .default(sql`'{}'`),
     aiDisclosureText: text("ai_disclosure_text").notNull(),
     attorneysSeeFinancials: boolean("attorneys_see_financials").notNull().default(false),
-    ipAllowlist: text("ip_allowlist").array().notNull().default(sql`'{}'`),
+    ipAllowlist: text("ip_allowlist")
+      .array()
+      .notNull()
+      .default(sql`'{}'`),
     provisionedAt: timestamp("provisioned_at", { withTimezone: true }).notNull().defaultNow(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

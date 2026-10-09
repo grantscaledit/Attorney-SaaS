@@ -14,7 +14,8 @@ export const issueUserSetupLink = defineCommand({
   input: z.object({ userId }),
   async run(ctx, input) {
     const target = await loadUserForUpdate(ctx.tx, input.userId);
-    if (target.status !== "active") throw new CommandError("invalid_state", "Reactivate the user first.");
+    if (target.status !== "active")
+      throw new CommandError("invalid_state", "Reactivate the user first.");
     const createdBy = ctx.principal.type === "user" ? ctx.principal.user.id : null;
     const link = await issueSetupLink(ctx.tx, target.id, createdBy);
     return {
@@ -48,7 +49,10 @@ export const resetUserMfa = defineCommand({
       .where(eq(users.id, before.id))
       .returning();
     if (!after) throw new Error("update returned no row");
-    const ended = await ctx.tx.delete(sessions).where(eq(sessions.userId, before.id)).returning({ id: sessions.id });
+    const ended = await ctx.tx
+      .delete(sessions)
+      .where(eq(sessions.userId, before.id))
+      .returning({ id: sessions.id });
     return {
       result: { userId: after.id },
       audit: [
@@ -71,7 +75,10 @@ export const revokeUserSessions = defineCommand({
   input: z.object({ userId }),
   async run(ctx, input) {
     const target = await loadUserForUpdate(ctx.tx, input.userId);
-    const ended = await ctx.tx.delete(sessions).where(eq(sessions.userId, target.id)).returning({ id: sessions.id });
+    const ended = await ctx.tx
+      .delete(sessions)
+      .where(eq(sessions.userId, target.id))
+      .returning({ id: sessions.id });
     return {
       result: { sessionsEnded: ended.length },
       audit: [

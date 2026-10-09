@@ -15,13 +15,24 @@ export const updateFirmSettings = defineCommand({
   permission: "firm.settings.update",
   input: firmSettingsInput,
   async run(ctx, input) {
-    const [before] = await ctx.tx.select().from(firmSettings).where(eq(firmSettings.id, 1)).for("update");
-    if (!before) throw new CommandError("not_found", "Firm settings are missing. Re-run provisioning.");
+    const [before] = await ctx.tx
+      .select()
+      .from(firmSettings)
+      .where(eq(firmSettings.id, 1))
+      .for("update");
+    if (!before)
+      throw new CommandError("not_found", "Firm settings are missing. Re-run provisioning.");
 
     // Lockout guard: an allowlist that excludes the person saving it would sign them out on the next request.
-    if (input.ipAllowlist.length > 0 && ctx.principal.type === "user" && !isIpAllowed(ctx.request.ip, input.ipAllowlist)) {
+    if (
+      input.ipAllowlist.length > 0 &&
+      ctx.principal.type === "user" &&
+      !isIpAllowed(ctx.request.ip, input.ipAllowlist)
+    ) {
       throw new CommandError("validation", "Some fields need attention.", {
-        ipAllowlist: [`The list must include your current address (${ctx.request.ip ?? "unknown"}).`],
+        ipAllowlist: [
+          `The list must include your current address (${ctx.request.ip ?? "unknown"}).`,
+        ],
       });
     }
 

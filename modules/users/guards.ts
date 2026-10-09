@@ -18,13 +18,28 @@ export async function loadUserForUpdate(tx: DbOrTx, userId: string): Promise<Use
 
 /** Snapshot for audit rows: identity and access fields only. */
 export function userSnapshot(u: UserRow) {
-  return { id: u.id, name: u.name, email: u.email, role: u.role, status: u.status, title: u.title, twoFactorEnabled: u.twoFactorEnabled };
+  return {
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    status: u.status,
+    title: u.title,
+    twoFactorEnabled: u.twoFactorEnabled,
+  };
 }
 
 export async function activeStaffCount(tx: DbOrTx, excludeUserId?: string): Promise<number> {
-  const conditions = [eq(users.status, "active"), isNull(users.deletedAt), inArray(users.role, [...ASSIGNABLE_STAFF_ROLES])];
+  const conditions = [
+    eq(users.status, "active"),
+    isNull(users.deletedAt),
+    inArray(users.role, [...ASSIGNABLE_STAFF_ROLES]),
+  ];
   if (excludeUserId) conditions.push(ne(users.id, excludeUserId));
-  const [row] = await tx.select({ n: count() }).from(users).where(and(...conditions));
+  const [row] = await tx
+    .select({ n: count() })
+    .from(users)
+    .where(and(...conditions));
   return row?.n ?? 0;
 }
 
@@ -47,8 +62,18 @@ export async function assertNotLastOwner(tx: DbOrTx, target: UserRow): Promise<v
   const [row] = await tx
     .select({ n: count() })
     .from(users)
-    .where(and(eq(users.role, "owner_attorney"), eq(users.status, "active"), isNull(users.deletedAt), ne(users.id, target.id)));
+    .where(
+      and(
+        eq(users.role, "owner_attorney"),
+        eq(users.status, "active"),
+        isNull(users.deletedAt),
+        ne(users.id, target.id),
+      ),
+    );
   if ((row?.n ?? 0) === 0) {
-    throw new CommandError("invalid_state", "The firm must keep at least one active owner attorney.");
+    throw new CommandError(
+      "invalid_state",
+      "The firm must keep at least one active owner attorney.",
+    );
   }
 }

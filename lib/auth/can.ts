@@ -159,7 +159,11 @@ const POLICY: Record<Role, Partial<Record<Action, Rule>>> = {
   vendor_support: {},
 };
 
-export function can(actor: Actor | null | undefined, action: Action, ctx: CanContext = {}): boolean {
+export function can(
+  actor: Actor | null | undefined,
+  action: Action,
+  ctx: CanContext = {},
+): boolean {
   if (!actor || actor.status !== "active") return false;
   const rule = POLICY[actor.role][action];
   if (rule === undefined) return false;
@@ -175,6 +179,10 @@ export class ForbiddenError extends Error {
   }
 }
 
-export function assertCan(actor: Actor | null | undefined, action: Action, ctx: CanContext = {}): void {
+export function assertCan(
+  actor: Actor | null | undefined,
+  action: Action,
+  ctx: CanContext = {},
+): void {
   if (!can(actor, action, ctx)) throw new ForbiddenError(action);
 }

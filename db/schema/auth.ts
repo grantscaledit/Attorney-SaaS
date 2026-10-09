@@ -1,4 +1,13 @@
-import { boolean, index, integer, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { ROLES, USER_STATUSES } from "../../lib/auth/roles";
 
 /*
@@ -96,7 +105,10 @@ export const twoFactors = pgTable(
     lockedUntil: timestamp("locked_until", { withTimezone: true }),
     ...timestamps,
   },
-  (t) => [index("two_factors_user_id_idx").on(t.userId), index("two_factors_secret_idx").on(t.secret)],
+  (t) => [
+    index("two_factors_user_id_idx").on(t.userId),
+    index("two_factors_secret_idx").on(t.secret),
+  ],
 );
 
 /** One-time invitation links. Only the SHA-256 of the token is stored. */

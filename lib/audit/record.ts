@@ -32,7 +32,11 @@ function toJson(value: unknown): unknown {
   return redact(JSON.parse(JSON.stringify(value)) as unknown);
 }
 
-function actorColumns(actor: AuditActor): { actorType: AuditActorType; actorId: string | null; actorLabel: string | null } {
+function actorColumns(actor: AuditActor): {
+  actorType: AuditActorType;
+  actorId: string | null;
+  actorLabel: string | null;
+} {
   switch (actor.type) {
     case "user":
     case "vendor":

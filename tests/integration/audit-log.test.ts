@@ -4,14 +4,18 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { auditLog } from "@/db/schema";
 import { recordAudit } from "@/lib/audit/record";
 import { verifyAuditChain } from "@/lib/audit/verify";
-import { useFreshDatabase } from "./helpers";
+import { withFreshDatabase } from "./helpers";
 
-const { db, url } = useFreshDatabase();
+const { db, url } = withFreshDatabase();
 
 describe("audit_log integrity", () => {
   beforeAll(async () => {
     for (let i = 0; i < 5; i++) {
-      await recordAudit(db(), { actor: { type: "system", label: "test" }, action: `test.event_${i}`, after: { i } });
+      await recordAudit(db(), {
+        actor: { type: "system", label: "test" },
+        action: `test.event_${i}`,
+        after: { i },
+      });
     }
   });
 
@@ -24,7 +28,12 @@ describe("audit_log integrity", () => {
   });
 
   it("verifies an intact chain", async () => {
-    expect(await verifyAuditChain(db())).toEqual({ ok: true, checked: 5, firstInvalidSeq: null, reason: null });
+    expect(await verifyAuditChain(db())).toEqual({
+      ok: true,
+      checked: 5,
+      firstInvalidSeq: null,
+      reason: null,
+    });
   });
 
   it("rejects UPDATE, DELETE and TRUNCATE", async () => {
@@ -45,8 +54,17 @@ describe("audit_log integrity", () => {
   it("ignores caller-supplied seq, timestamp and hash", async () => {
     await db()
       .insert(auditLog)
-      .values({ actorType: "system", action: "test.forged", seq: 999, hash: "forged", occurredAt: new Date(0) });
-    const [row] = await db().select().from(auditLog).where(sql`action = 'test.forged'`);
+      .values({
+        actorType: "system",
+        action: "test.forged",
+        seq: 999,
+        hash: "forged",
+        occurredAt: new Date(0),
+      });
+    const [row] = await db()
+      .select()
+      .from(auditLog)
+      .where(sql`action = 'test.forged'`);
     expect(row!.seq).toBe(6);
     expect(row!.hash).not.toBe("forged");
     expect(row!.occurredAt.getTime()).toBeGreaterThan(0);
@@ -58,14 +76,26 @@ describe("audit_log integrity", () => {
       action: "test.redaction",
       after: { name: "Pat", password: "pw", nested: { ssn: "123-45-6789" } },
     });
-    const [row] = await db().select().from(auditLog).where(sql`action = 'test.redaction'`);
-    expect(row!.after).toEqual({ name: "Pat", password: "[REDACTED]", nested: { ssn: "[REDACTED]" } });
+    const [row] = await db()
+      .select()
+      .from(auditLog)
+      .where(sql`action = 'test.redaction'`);
+    expect(row!.after).toEqual({
+      name: "Pat",
+      password: "[REDACTED]",
+      nested: { ssn: "[REDACTED]" },
+    });
   });
 
   it("keeps the chain valid under concurrent writers", async () => {
     await Promise.all(
       Array.from({ length: 40 }, (_, i) =>
-        db().transaction((tx) => recordAudit(tx, { actor: { type: "system", label: "c" }, action: `test.concurrent_${i}` })),
+        db().transaction((tx) =>
+          recordAudit(tx, {
+            actor: { type: "system", label: "c" },
+            action: `test.concurrent_${i}`,
+          }),
+        ),
       ),
     );
     const result = await verifyAuditChain(db());
@@ -80,9 +110,14 @@ describe("audit_log integrity", () => {
     await c.query("BEGIN");
     await c.query("ALTER TABLE audit_log DISABLE TRIGGER audit_log_no_update_delete");
     await c.query("UPDATE audit_log SET after = '{\"i\": 99}' WHERE seq = 3");
-    const { rows } = await c.query("SELECT first_invalid_seq, reason FROM audit_log_verify_chain()");
+    const { rows } = await c.query(
+      "SELECT first_invalid_seq, reason FROM audit_log_verify_chain()",
+    );
     await c.query("ROLLBACK");
     await c.end();
-    expect(rows[0]).toEqual({ first_invalid_seq: "3", reason: "row content does not match its hash" });
+    expect(rows[0]).toEqual({
+      first_invalid_seq: "3",
+      reason: "row content does not match its hash",
+    });
   });
 });

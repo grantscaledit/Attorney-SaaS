@@ -35,7 +35,10 @@ export const bootstrapFirm = defineCommand({
     const [existing] = await ctx.tx.select({ n: count() }).from(firmSettings);
     const [people] = await ctx.tx.select({ n: count() }).from(users);
     if ((existing?.n ?? 0) > 0 || (people?.n ?? 0) > 0) {
-      throw new CommandError("conflict", "This database already holds a firm. Bootstrap only runs on an empty database.");
+      throw new CommandError(
+        "conflict",
+        "This database already holds a firm. Bootstrap only runs on an empty database.",
+      );
     }
 
     const [settings] = await ctx.tx
@@ -55,7 +58,12 @@ export const bootstrapFirm = defineCommand({
 
     const [owner] = await ctx.tx
       .insert(users)
-      .values({ name: input.owner.name, email: input.owner.email, title: input.owner.title, role: "owner_attorney" })
+      .values({
+        name: input.owner.name,
+        email: input.owner.email,
+        title: input.owner.title,
+        role: "owner_attorney",
+      })
       .returning();
     if (!owner) throw new Error("insert returned no row");
 
@@ -68,7 +76,12 @@ export const bootstrapFirm = defineCommand({
           action: "firm.provisioned",
           entityType: "firm_settings",
           entityId: "1",
-          after: { slug: settings.slug, legalName: settings.legalName, practiceAreas: settings.practiceAreas, tier: ctx.tier },
+          after: {
+            slug: settings.slug,
+            legalName: settings.legalName,
+            practiceAreas: settings.practiceAreas,
+            tier: ctx.tier,
+          },
         },
         {
           action: "users.invited",

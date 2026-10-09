@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { ACTIONS, type Action, type Actor, type MatterScope, can, assertCan, ForbiddenError } from "./can";
+import {
+  ACTIONS,
+  type Action,
+  type Actor,
+  type MatterScope,
+  can,
+  assertCan,
+  ForbiddenError,
+} from "./can";
 import { ROLES, type Role } from "./roles";
 
 /*
@@ -80,17 +88,28 @@ describe("can(): account state", () => {
 describe("can(): matter scope", () => {
   const attorney = actor("attorney", "att-1");
   const own: MatterScope = { kind: "matter", responsibleAttorneyId: "att-1", assignedUserIds: [] };
-  const assigned: MatterScope = { kind: "matter", responsibleAttorneyId: "att-2", assignedUserIds: ["att-1"] };
-  const other: MatterScope = { kind: "matter", responsibleAttorneyId: "att-2", assignedUserIds: ["para-1"] };
+  const assigned: MatterScope = {
+    kind: "matter",
+    responsibleAttorneyId: "att-2",
+    assignedUserIds: ["att-1"],
+  };
+  const other: MatterScope = {
+    kind: "matter",
+    responsibleAttorneyId: "att-2",
+    assignedUserIds: ["para-1"],
+  };
 
-  it.each(["matters.read", "matters.write", "documents.read", "deadlines.write", "approvals.decide"] as const)(
-    "attorney %s: own and assigned matters only",
-    (action) => {
-      expect(can(attorney, action, { resource: own })).toBe(true);
-      expect(can(attorney, action, { resource: assigned })).toBe(true);
-      expect(can(attorney, action, { resource: other })).toBe(false);
-    },
-  );
+  it.each([
+    "matters.read",
+    "matters.write",
+    "documents.read",
+    "deadlines.write",
+    "approvals.decide",
+  ] as const)("attorney %s: own and assigned matters only", (action) => {
+    expect(can(attorney, action, { resource: own })).toBe(true);
+    expect(can(attorney, action, { resource: assigned })).toBe(true);
+    expect(can(attorney, action, { resource: other })).toBe(false);
+  });
 
   it("owner attorney can act on any matter", () => {
     expect(can(actor("owner_attorney"), "approvals.decide", { resource: other })).toBe(true);

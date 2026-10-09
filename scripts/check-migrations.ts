@@ -37,7 +37,12 @@ if (base) {
   const changed = git(["diff", "--name-status", `${base}...HEAD`, "--", "db/migrations"])
     .split("\n")
     .filter(Boolean)
-    .filter((line) => !line.startsWith("A\t") && !line.endsWith("_journal.json") && !/_snapshot\.json$/.test(line));
+    .filter(
+      (line) =>
+        !line.startsWith("A\t") &&
+        !line.endsWith("_journal.json") &&
+        !/_snapshot\.json$/.test(line),
+    );
   if (changed.length > 0) {
     fail(`migrations already on ${base} were modified or removed:\n${changed.join("\n")}`);
   }
