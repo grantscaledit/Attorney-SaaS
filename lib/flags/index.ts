@@ -1,25 +1,17 @@
 import "server-only";
 import { cache } from "react";
-import { getDb, type DbOrTx } from "@/db/client";
-import { featureFlags } from "@/db/schema";
+import { getDb } from "@/db/client";
 import { env } from "@/lib/env";
-import { FEATURE_FLAGS, isFeatureFlag, type FeatureFlag } from "./catalog";
-import { evaluateFeature, type FeatureState, type FlagOverrides } from "./evaluate";
+import { FEATURE_FLAGS, type FeatureFlag } from "./catalog";
+import { evaluateFeature, type FeatureState } from "./evaluate";
+import { loadFlagOverrides } from "./load";
 
 export * from "./catalog";
 export * from "./evaluate";
-
-export async function loadFlagOverrides(db: DbOrTx = getDb()): Promise<FlagOverrides> {
-  const rows = await db
-    .select({ key: featureFlags.key, enabled: featureFlags.enabled })
-    .from(featureFlags);
-  const overrides: FlagOverrides = {};
-  for (const row of rows) if (isFeatureFlag(row.key)) overrides[row.key] = row.enabled;
-  return overrides;
-}
+export { featureEnabledIn, loadFlagOverrides } from "./load";
 
 /** Per-request memoized overrides for server components. */
-const requestOverrides = cache(() => loadFlagOverrides());
+const requestOverrides = cache(() => loadFlagOverrides(getDb()));
 
 /** The one way application code asks whether a capability is on. */
 export async function hasFeature(flag: FeatureFlag): Promise<boolean> {

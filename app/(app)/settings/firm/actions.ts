@@ -22,6 +22,8 @@ export async function updateFirmSettingsAction(
       postalCode: text("postalCode"),
       phone: text("phone"),
       website: text("website"),
+      bookingUrl: text("bookingUrl"),
+      intakeFormUrl: text("intakeFormUrl"),
       practiceAreas: form.getAll("practiceAreas").map(String),
       aiDisclosureText: text("aiDisclosureText"),
       attorneysSeeFinancials: form.get("attorneysSeeFinancials") === "on",

@@ -29,6 +29,10 @@ export const firmSettings = pgTable(
       .default(sql`'{}'`),
     aiDisclosureText: text("ai_disclosure_text").notNull(),
     attorneysSeeFinancials: boolean("attorneys_see_financials").notNull().default(false),
+    /** Public booking page (GHL calendar) used in A1 and A2 messages. */
+    bookingUrl: text("booking_url"),
+    /** Pre-consult intake form link sent with A7 confirmations. */
+    intakeFormUrl: text("intake_form_url"),
     ipAllowlist: text("ip_allowlist")
       .array()
       .notNull()

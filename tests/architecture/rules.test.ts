@@ -62,15 +62,28 @@ describe("authorization: every entry point checks the session", () => {
     expect(unguarded).toEqual([]);
   });
 
-  it("every API route except auth and health checks the session", () => {
+  it("every API route except auth, health and webhooks checks the session", () => {
     const PUBLIC = new Set(["app/api/auth/[...all]/route.ts", "app/api/health/route.ts"]);
     const routes = source.filter(
-      (f) => /^app\/api\/.*route\.ts$/.test(rel(f)) && !PUBLIC.has(rel(f)),
+      (f) =>
+        /^app\/api\/.*route\.ts$/.test(rel(f)) &&
+        !PUBLIC.has(rel(f)) &&
+        !rel(f).startsWith("app/api/webhooks/"),
     );
     const unguarded = routes
       .filter((f) => !/\brequire(Session|User|Permission)\(/.test(read(f)))
       .map(rel);
     expect(unguarded).toEqual([]);
+  });
+
+  it("every webhook route authenticates the sender before doing anything", () => {
+    const routes = source.filter((f) => /^app\/api\/webhooks\/.*route\.ts$/.test(rel(f)));
+    expect(routes.length).toBeGreaterThan(0);
+    const unguarded = routes.filter((f) => !/\bhandleGhlWebhook\(/.test(read(f))).map(rel);
+    expect(unguarded).toEqual([]);
+    // The handler itself must verify credentials.
+    const handler = read(path.join(ROOT, "modules/ghl/ingest.ts"));
+    expect(handler).toMatch(/\bauthenticateWebhook\(/);
   });
 
   it("every server action in the signed-in app goes through runCommand or requireSession", () => {

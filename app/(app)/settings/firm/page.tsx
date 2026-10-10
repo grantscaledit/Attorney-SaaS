@@ -36,6 +36,8 @@ export default async function FirmSettingsPage() {
           postalCode: settings.postalCode ?? "",
           phone: settings.phone ?? "",
           website: settings.website ?? "",
+          bookingUrl: settings.bookingUrl ?? "",
+          intakeFormUrl: settings.intakeFormUrl ?? "",
           practiceAreas: settings.practiceAreas,
           aiDisclosureText: settings.aiDisclosureText,
           attorneysSeeFinancials: settings.attorneysSeeFinancials,

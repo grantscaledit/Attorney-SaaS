@@ -34,6 +34,14 @@ export const firmSettingsInput = z.object({
     (v) => v === null || /^https:\/\/\S+$/.test(v),
     "Use a full https:// address",
   ),
+  bookingUrl: optionalText(300).refine(
+    (v) => v === null || /^https:\/\/\S+$/.test(v),
+    "Use a full https:// address",
+  ),
+  intakeFormUrl: optionalText(300).refine(
+    (v) => v === null || /^https:\/\/\S+$/.test(v),
+    "Use a full https:// address",
+  ),
   practiceAreas: z.array(z.enum(PRACTICE_AREAS)).min(1, "Choose at least one practice area"),
   aiDisclosureText: z
     .string()

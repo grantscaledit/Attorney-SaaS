@@ -18,6 +18,8 @@ type Initial = {
   postalCode: string;
   phone: string;
   website: string;
+  bookingUrl: string;
+  intakeFormUrl: string;
   practiceAreas: string[];
   aiDisclosureText: string;
   attorneysSeeFinancials: boolean;
@@ -107,6 +109,14 @@ export function FirmSettingsForm({
           </div>
           {text("phone", "Main phone", { optional: true, autoComplete: "tel" })}
           {text("website", "Website", { optional: true, autoComplete: "url" })}
+          {text("bookingUrl", "Consult booking page", {
+            optional: true,
+            hint: "The GoHighLevel calendar link sent in missed-call and enquiry replies.",
+          })}
+          {text("intakeFormUrl", "Pre-consult intake form", {
+            optional: true,
+            hint: "Sent with consult confirmations.",
+          })}
         </PanelBody>
       </Panel>
 
