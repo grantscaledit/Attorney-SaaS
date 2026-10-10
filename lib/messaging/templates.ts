@@ -51,7 +51,7 @@ export const DEFAULT_TEMPLATES = [
     channel: "sms",
     label: "New enquiry acknowledgement (text)",
     when: "Within a minute of a web form, chat or email enquiry, only if the person ticked the SMS consent box.",
-    body: `Hi {{firstName|there}}, thank you for contacting {{firmName}}. We received your enquiry and will be in touch shortly. To choose a time now: {{bookingUrl}}. ${STOP}`,
+    body: `Hi {{firstName|there}}, thank you for contacting {{firmName}}. We received your enquiry and will be in touch shortly. You can choose a time at {{bookingUrl}} or reply to this text. ${STOP}`,
   },
   {
     key: "A2.email",
@@ -79,7 +79,7 @@ export const DEFAULT_TEMPLATES = [
     channel: "sms",
     label: "Consult confirmation",
     when: "When a consult is booked or moved to a new time.",
-    body: `{{firmName}}: your consultation is confirmed for {{appointmentTime}}. Please complete our intake form before we meet: {{intakeFormUrl}} ${STOP}`,
+    body: `{{firmName}}: your consultation is confirmed for {{appointmentTime}}. ${STOP} Please complete our intake form before we meet: {{intakeFormUrl}}`,
   },
   {
     key: "A7.reminder_24h.sms",

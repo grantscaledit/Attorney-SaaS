@@ -7,7 +7,11 @@ import {
   processGhlWebhook,
   retryGhlWebhook,
 } from "@/modules/ghl/commands/process-webhook";
-import { reconcileGhlBatch, recordSyncRun } from "@/modules/ghl/commands/reconcile";
+import {
+  reconcileGhlBatch,
+  recordSyncRun,
+  requestReconcile,
+} from "@/modules/ghl/commands/reconcile";
 import { claimMessage, markStaleSend, recordSendResult } from "@/modules/messaging/commands/outbox";
 import {
   approveMessageTemplate,
@@ -52,6 +56,7 @@ export const COMMANDS = [
   retryGhlWebhook,
   reconcileGhlBatch,
   recordSyncRun,
+  requestReconcile,
   claimMessage,
   recordSendResult,
   markStaleSend,

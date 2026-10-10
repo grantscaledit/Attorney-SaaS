@@ -44,7 +44,7 @@ before it ships. Do not code vendor endpoints or legal deadlines from memory.
 /lib            auth, audit, commands, flags, crypto, env, log, ui
 /db             schema, migrations, seed (demo firm)
 /jobs           pg-boss worker and handlers, one file per automation ID
-/ghl            snapshot export, field map (Phase 1)
+/ghl            snapshot manifest and workflow bodies, field map
 /scripts        provision-firm.ts, migrate.ts, offboard-firm.ts (Phase 8)
 /docs           ADRs, runbooks, security overview, phase log
 /tests          integration and architecture tests (unit tests sit next to source)
@@ -76,3 +76,10 @@ pnpm provision-firm --help
 - Never put a real client's data in fixtures, seeds, tests or screenshots. The demo firm uses
   synthetic people only.
 - Commit messages reference automation IDs (A1, C2...) when relevant.
+- GoHighLevel: every API call goes through `lib/ghl/client.ts`; every fact about GHL's API lives in
+  `lib/ghl/endpoints.ts` with its source, and anything unverified is listed in
+  `docs/ghl/api-notes.md`. Webhooks are stored first, then processed (ADR 0006).
+- Automatic messages go through the outbox (`modules/messaging/commands/outbox.ts`): idempotency
+  key, owner-approved template, consent, do-not-disturb and quiet hours. Never call
+  `sendMessage` from anywhere else.
+- Metrics: read `modules/metrics/definitions.ts`; never re-derive a dashboard number elsewhere.

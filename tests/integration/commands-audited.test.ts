@@ -246,6 +246,11 @@ const FIXTURES: Record<string, Fixture> = {
     input: () => ({ key: "ghl.reconcile", runId: "fixture-run", phase: "started" }),
     expectAction: "ghl.sync_started",
   },
+  "ghl.request_reconcile": {
+    principal: () => asUser(owner),
+    input: () => ({}),
+    expectAction: "ghl.reconcile_requested",
+  },
   "messaging.claim": {
     principal: () => SYSTEM,
     input: async () => {

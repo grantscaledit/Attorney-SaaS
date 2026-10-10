@@ -1,4 +1,6 @@
 import "server-only";
+import { can, type Actor } from "@/lib/auth/can";
+import { unansweredLeadCount } from "@/modules/intake/queries";
 
 export type OpsCounter = {
   key: "approvals" | "deadlines_7d" | "unanswered_leads";
@@ -13,9 +15,11 @@ export type OpsCounter = {
 /**
  * Values for the top-bar counters. Each module replaces its stub when it ships:
  * approvals (Phase 2), deadlines (Phase 4), leads (Phase 1). Reading the same
- * metric views as the dashboard keeps the numbers identical (spec Section 9).
+ * queries as the module's own pages keeps the numbers identical (spec Section 9).
  */
-export async function loadOpsCounters(): Promise<OpsCounter[]> {
+export async function loadOpsCounters(actor: Actor): Promise<OpsCounter[]> {
+  const leadsVisible = can(actor, "leads.read");
+  const unanswered = leadsVisible ? await unansweredLeadCount(actor) : null;
   return [
     {
       key: "approvals",
@@ -36,10 +40,10 @@ export async function loadOpsCounters(): Promise<OpsCounter[]> {
     {
       key: "unanswered_leads",
       label: "Unanswered leads",
-      value: null,
-      href: null,
+      value: unanswered,
+      href: leadsVisible ? "/intake/leads?view=unanswered" : null,
       attention: true,
-      unavailableReason: "Lead counts start once GoHighLevel is connected.",
+      unavailableReason: "Leads are not part of your role.",
     },
   ];
 }

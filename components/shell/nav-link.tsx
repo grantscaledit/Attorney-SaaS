@@ -3,16 +3,29 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileClock, Fingerprint, Landmark, LayoutGrid, ToggleRight, Users } from "lucide-react";
+import {
+  FileClock,
+  Fingerprint,
+  Inbox,
+  Landmark,
+  LayoutGrid,
+  MessageSquareText,
+  Plug,
+  ToggleRight,
+  Users,
+} from "lucide-react";
 import { cn } from "@/lib/ui/cn";
 import type { NavItem } from "@/lib/nav";
 
 const ICONS = {
   overview: LayoutGrid,
+  intake: Inbox,
   audit: FileClock,
   firm: Landmark,
   users: Users,
   features: ToggleRight,
+  integrations: Plug,
+  templates: MessageSquareText,
   security: Fingerprint,
 } as const;
 

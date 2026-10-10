@@ -83,5 +83,10 @@ envVarGroups:
         sync: false
       - key: GHL_WEBHOOK_SECRET
         sync: false
+      # GoHighLevel API (Phase 1): set by hand from the sub-account (docs/runbooks/ghl-setup.md)
+      - key: GHL_PRIVATE_TOKEN
+        sync: false
+      - key: GHL_LOCATION_ID
+        sync: false
       - key: LOG_LEVEL
         value: info

@@ -152,3 +152,22 @@ export const recordSyncRun = defineCommand({
     };
   },
 });
+
+/** Owner action: run reconciliation now instead of waiting for the night. The job does the work. */
+export const requestReconcile = defineCommand({
+  name: "ghl.request_reconcile",
+  permission: "firm.settings.update",
+  input: z.object({}),
+  async run() {
+    return {
+      result: { requested: true },
+      audit: [
+        {
+          action: "ghl.reconcile_requested",
+          entityType: "sync_state",
+          entityId: SYNC_KEYS.reconcile,
+        },
+      ],
+    };
+  },
+});

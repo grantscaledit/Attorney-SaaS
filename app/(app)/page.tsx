@@ -32,6 +32,8 @@ import {
 } from "@/modules/audit/queries";
 import { listUsers, myRecentAuthEvents, summarizeAccess } from "@/modules/users/queries";
 import { DEFAULT_AI_DISCLOSURE } from "@/modules/firm/schemas";
+import { ghlConfigured } from "@/lib/ghl/client";
+import { listTemplates } from "@/modules/messaging/queries";
 
 export const metadata: Metadata = { title: "Overview" };
 
@@ -54,16 +56,18 @@ export default async function OverviewPage() {
   const isOwner = can(user, "audit.read", { policy });
   const canSeeUsers = can(user, "users.read", { policy });
 
-  const [firm, people, head, events24h, failed24h, features, activity, mine] = await Promise.all([
-    loadFirmSettings(),
-    canSeeUsers ? listUsers(user) : Promise.resolve(null),
-    auditHead(),
-    auditCountLastHours(24),
-    failedSignInsLastHours(24),
-    allFeatureStates(),
-    isOwner ? recentAuditEvents(user, 10) : Promise.resolve(null),
-    myRecentAuthEvents(user, 6),
-  ]);
+  const [firm, people, head, events24h, failed24h, features, activity, mine, templates] =
+    await Promise.all([
+      loadFirmSettings(),
+      canSeeUsers ? listUsers(user) : Promise.resolve(null),
+      auditHead(),
+      auditCountLastHours(24),
+      failedSignInsLastHours(24),
+      allFeatureStates(),
+      isOwner ? recentAuditEvents(user, 10) : Promise.resolve(null),
+      myRecentAuthEvents(user, 6),
+      isOwner ? listTemplates(user) : Promise.resolve([]),
+    ]);
 
   const access = people ? summarizeAccess(people) : null;
   const seatLimit = userLimit(tier);
@@ -93,7 +97,16 @@ export default async function OverviewPage() {
       done: access ? access.awaitingSetup === 0 && access.activeUsers > 1 : false,
       href: "/settings/users",
     },
-    { label: "GoHighLevel connected", done: false, later: "Available with the intake release" },
+    {
+      label: DEMO_MODE ? "GoHighLevel connected (not in demo)" : "GoHighLevel connected",
+      done: ghlConfigured() && Boolean(firm.bookingUrl),
+      href: "/settings/integrations",
+    },
+    {
+      label: "Automatic message templates approved",
+      done: templates.length > 0 && templates.every((t) => t.approvedAt !== null),
+      href: "/settings/templates",
+    },
     {
       label: "Deadline rules verified by an attorney",
       done: false,

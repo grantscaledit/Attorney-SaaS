@@ -127,3 +127,21 @@ describe("rule 6: logs never carry message bodies", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe("rule 4: automatic messages only leave through the outbox", () => {
+  it("only the send job calls GHL's sendMessage", () => {
+    const callers = source
+      .filter((f) => !/\.test\.tsx?$/.test(f))
+      .filter((f) => /\.sendMessage\(/.test(read(f)))
+      .map(rel);
+    expect(callers).toEqual(["jobs/messaging/send.ts"]);
+  });
+
+  it("only lib/ghl/client.ts talks to the GHL API host", () => {
+    const offenders = source
+      .filter((f) => !/\.test\.tsx?$/.test(f))
+      .filter((f) => /leadconnectorhq\.com/.test(read(f)))
+      .map(rel);
+    expect(offenders).toEqual(["lib/ghl/endpoints.ts"]);
+  });
+});

@@ -27,6 +27,7 @@ import { DEFAULT_AI_DISCLOSURE } from "@/modules/firm/schemas";
 import { acceptInvite } from "@/modules/users/commands/accept-invite";
 import { inviteUser } from "@/modules/users/commands/invite";
 import { runBootstrap } from "@/scripts/lib/firm-bootstrap";
+import { seedDemoIntake } from "./demo-intake";
 import type { z } from "zod";
 
 const DEMO_PASSWORD = "Demo password for LexDesk 2026";
@@ -230,7 +231,9 @@ async function main(): Promise<void> {
     state: "TX",
     postalCode: "75069",
     phone: "(214) 555-0142",
-    website: undefined,
+    website: "https://siekierski-law.example.test",
+    bookingUrl: "https://book.example.test/siekierski-law/consult",
+    intakeFormUrl: "https://forms.example.test/siekierski-law/intake",
     practiceAreas: ["tax", "business", "estate"],
     aiDisclosureText: DEFAULT_AI_DISCLOSURE,
     attorneysSeeFinancials: false,
@@ -259,6 +262,10 @@ async function main(): Promise<void> {
       pending.push({ name: person.name, url: r.setupUrl });
     }
   }
+
+  console.log("Seeding intake activity…");
+  const intake = await seedDemoIntake(asOwner);
+  console.log(`  ${intake.leads} synthetic enquiries processed through the webhook pipeline.`);
 
   await smokeTest(`scott@${DOMAIN}`);
 
