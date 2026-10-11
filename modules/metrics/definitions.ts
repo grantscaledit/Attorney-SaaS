@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import type { DbOrTx } from "@/db/client";
-import { metricsConsults, metricsLeadFacts } from "@/db/schema";
+import { conflictChecks, metricsConsults, metricsLeadFacts } from "@/db/schema";
 
 /*
  * Intake metric definitions (spec Section 9). The SQL views live in migration
@@ -97,6 +97,26 @@ export const INTAKE_METRICS: Record<MetricId, MetricDefinition> = {
     definition: "Median days from first contact to retained, for leads retained in the period.",
   },
 };
+
+/** Point-in-time, not per period: the reviewer's backlog right now. */
+export const CONFLICT_FLAGS_PENDING = {
+  label: "Conflict flags pending",
+  definition:
+    "Conflict pre-screens (A6) that found at least one possible match and that no lawyer has cleared or confirmed yet. Checks with no matches also wait for sign-off but are not counted here.",
+} as const;
+
+export async function conflictFlagsPending(
+  db: DbOrTx,
+): Promise<{ flagged: number; unflagged: number }> {
+  const [r] = await db
+    .select({
+      flagged: sql<number>`count(*) filter (where ${conflictChecks.hitCount} > 0)::int`,
+      unflagged: sql<number>`count(*) filter (where ${conflictChecks.hitCount} = 0)::int`,
+    })
+    .from(conflictChecks)
+    .where(sql`${conflictChecks.status} = 'awaiting_review'`);
+  return { flagged: r?.flagged ?? 0, unflagged: r?.unflagged ?? 0 };
+}
 
 export type MetricValue = { value: number | null; numerator?: number; denominator?: number };
 export type IntakeMetrics = Record<MetricId, MetricValue>;

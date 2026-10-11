@@ -41,6 +41,8 @@ jobs:
     name: Unit and integration tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      HAS_ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
     services:
       postgres:
         image: postgres:16
@@ -61,6 +63,14 @@ jobs:
       # Builds a migrated template database from scratch, so this also proves
       # every migration applies cleanly to an empty database.
       - run: pnpm test:integration
+      # Live-model A3 evals (spec Section 6). The deterministic evals run in
+      # test:unit on every build; these need the repository secret and are
+      # skipped without it (forks, or before a key is configured).
+      - name: Live model evals
+        if: env.HAS_ANTHROPIC_KEY == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: pnpm eval
 
   e2e:
     name: End-to-end (Playwright)

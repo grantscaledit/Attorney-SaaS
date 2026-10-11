@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import {
   automationRuns,
@@ -138,7 +138,9 @@ async function turn(leadId: string, messageId: string): Promise<void> {
       and(
         eq(messages.contactId, msg.contactId),
         eq(messages.direction, "inbound"),
-        gt(messages.createdAt, msg.createdAt),
+        ne(messages.id, msg.id),
+        // Compared in SQL: a JS Date drops the microseconds Postgres stores.
+        gt(messages.createdAt, sql`(select created_at from messages where id = ${msg.id})`),
       ),
     )
     .limit(1);
@@ -269,19 +271,22 @@ export async function pendingA3(limit: number): Promise<{ leadId: string; messag
     .from(messages)
     .leftJoin(
       automationRuns,
-      and(eq(automationRuns.automationId, "A3"), eq(automationRuns.entityId, messages.id)),
+      and(
+        eq(automationRuns.automationId, "A3"),
+        eq(automationRuns.entityId, sql`${messages.id}::text`),
+      ),
     )
     .where(
       and(
         eq(messages.direction, "inbound"),
         inArray(messages.channel, ["sms", "chat"]),
         gt(messages.createdAt, since),
+        lt(messages.createdAt, before),
+        isNotNull(messages.leadId),
         isNull(automationRuns.id),
       ),
     )
     .orderBy(asc(messages.createdAt))
     .limit(limit);
-  return rows
-    .filter((r) => r.leadId && r.createdAt < before)
-    .map((r) => ({ leadId: r.leadId!, messageId: r.messageId }));
+  return rows.map((r) => ({ leadId: r.leadId!, messageId: r.messageId }));
 }

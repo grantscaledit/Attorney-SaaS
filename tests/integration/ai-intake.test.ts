@@ -13,13 +13,24 @@ import {
 } from "@/db/schema";
 import { aiCall } from "@/lib/ai/call";
 import type { SessionUser } from "@/lib/commands/define";
-import { runA3 } from "@/jobs/automations/A3";
+import { pendingA3, runA3 } from "@/jobs/automations/A3";
+import { processWebhookJob } from "@/jobs/ghl/process-webhook";
+import { handleGhlWebhook } from "@/modules/ghl/ingest";
 import { a3Output } from "@/modules/intake/a3-prompt";
 import { updateAiSettings } from "@/modules/firm/commands/ai-settings";
 import { saveReferralPartner } from "@/modules/intake/commands/followups";
 import { updateIntakeProfile } from "@/modules/users/commands/intake-profile";
 import { a3Reply, installScriptedModel, removeModel, seedInbound, seedLead } from "./ai-kit";
-import { configureGhlEnv, daytimeZone, FakeGhl, prepareMessaging, RecordingQueue } from "./ghl-kit";
+import {
+  configureGhlEnv,
+  daytimeZone,
+  FakeGhl,
+  ghlContactPayload,
+  prepareMessaging,
+  RecordingQueue,
+  TEST_LOCATION,
+  webhookRequest,
+} from "./ghl-kit";
 import { asUser, provisionTestFirm, run, withFreshDatabase } from "./helpers";
 
 /*
@@ -33,7 +44,7 @@ configureGhlEnv();
 const { db } = withFreshDatabase();
 let owner: SessionUser;
 const ghl = new FakeGhl();
-new RecordingQueue().install();
+const queue = new RecordingQueue().install();
 
 const TAX_COMPLETE = [
   { questionId: "agency", value: "IRS" },
@@ -399,5 +410,40 @@ describe("A3 intake assistant", () => {
     const transcript = model.requests[0]!.messages[0]!.content;
     expect(transcript).toContain("Prospect: Hi");
     expect(transcript).toContain("Prospect: I got a tax notice");
+  });
+
+  it("an inbound text webhook queues A3 after commit, and the sweep recovers a lost job", async () => {
+    installScriptedModel({});
+    ghl.contacts.set("c_a3_hook", ghlContactPayload("c_a3_hook", { timezone: daytimeZone() }));
+    const res = await handleGhlWebhook(
+      webhookRequest({
+        type: "InboundMessage",
+        locationId: TEST_LOCATION,
+        contactId: "c_a3_hook",
+        messageType: "SMS",
+        direction: "inbound",
+        messageId: "sms_a3_hook_1",
+        body: "Hi, I got a notice from the IRS. My SSN is 123-45-6789.",
+        dateAdded: new Date().toISOString(),
+      }),
+    );
+    expect(res.status).toBe(200);
+    for (const job of queue.take("ghl.webhook")) await processWebhookJob(String(job.eventId));
+    const jobs = queue.take("automation.A3");
+    expect(jobs).toHaveLength(1);
+    const { leadId, messageId } = jobs[0] as { leadId: string; messageId: string };
+    const [m] = await db().select().from(messages).where(eq(messages.id, messageId));
+    expect(m!.body).toContain("[SSN ending 6789]");
+
+    // The job was lost: the sweep finds the message once it is two minutes old.
+    expect((await pendingA3(10)).map((p) => p.messageId)).not.toContain(messageId);
+    await db()
+      .update(messages)
+      .set({ createdAt: new Date(Date.now() - 5 * 60_000) })
+      .where(eq(messages.id, messageId));
+    expect((await pendingA3(10)).map((p) => p.messageId)).toContain(messageId);
+    await runA3(leadId, messageId);
+    expect((await pendingA3(10)).map((p) => p.messageId)).not.toContain(messageId);
+    expect(await approvalsFor(leadId)).toHaveLength(1);
   });
 });

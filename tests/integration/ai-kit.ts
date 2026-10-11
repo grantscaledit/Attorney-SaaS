@@ -87,12 +87,13 @@ export async function seedLead(
   return { leadId: lead!.id, contactId: contact!.id, messageId };
 }
 
+/** Inbound message. Without `at`, timestamps come from the database (microsecond precision, as live). */
 export async function seedInbound(
   contactId: string,
   leadId: string,
   body: string,
   channel: "sms" | "chat" = "sms",
-  at = new Date(),
+  at?: Date,
 ): Promise<string> {
   const [m] = await getDb()
     .insert(messages)
@@ -103,8 +104,8 @@ export async function seedInbound(
       channel,
       status: "received",
       body,
-      occurredAt: at,
-      createdAt: at,
+      occurredAt: at ?? new Date(),
+      ...(at ? { createdAt: at } : {}),
     })
     .returning({ id: messages.id });
   return m!.id;

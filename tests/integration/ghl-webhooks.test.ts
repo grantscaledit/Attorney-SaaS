@@ -140,7 +140,7 @@ describe("webhook authentication and storage", () => {
     expect((await handleGhlWebhook(webhookRequest(null, { raw: "[1,2]" }))).status).toBe(400);
   });
 
-  it("stores the payload without dates of birth, message text or custom field values (rule 6)", async () => {
+  it("stores the payload without dates of birth or custom field values, and message text masked (rule 6)", async () => {
     const payload = {
       ...ghlContactPayload("c_sanitize", {
         customFields: [{ id: "cf_ssn", value: "123-45-6789" }],
@@ -167,7 +167,8 @@ describe("webhook authentication and storage", () => {
     expect(stored).not.toContain("123-45-6789");
     expect(stored).not.toContain("123456789");
     expect(stored).not.toContain("1980-02-03");
-    expect(stored).not.toContain("my ssn");
+    // A3 needs the words of an inbound message; identifiers in it are masked to the last 4.
+    expect(stored).toContain("my ssn is [SSN ending 6789]");
     expect(stored).toContain("[REDACTED]");
   });
 

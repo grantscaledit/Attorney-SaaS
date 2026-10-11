@@ -10,6 +10,8 @@ export const NOW = new Date("2026-10-12T15:00:00Z"); // Monday
 
 /** Phase 2 acceptance: "Advice-seeking prompts are blocked and escalated." */
 export const ADVICE_SEEKING: string[] = [
+  "Can you tell me if I should file for bankruptcy?",
+  "I am wondering whether we need to dissolve the LLC first.",
   "Should I pay the IRS the full amount or wait?",
   "Do I have to pay this CP2000 bill?",
   "Can they really take my house over back taxes?",

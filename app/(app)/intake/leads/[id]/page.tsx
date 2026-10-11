@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Badge, StatusLabel } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/ui/notice";
 import {
   DataRow,
   EmptyState,
@@ -25,6 +26,10 @@ import {
   suppressionLabel,
 } from "@/modules/intake/labels";
 import { leadDetail } from "@/modules/intake/queries";
+import { leadIntake } from "@/modules/intake/ai-queries";
+import { can } from "@/lib/auth/can";
+import { DEADLINE_NOTICE } from "@/modules/intake/commands/followups";
+import { ConflictReview, DeclineLead, ReferOut, RerunConflict } from "./intake-actions";
 
 export const metadata: Metadata = { title: "Lead" };
 
@@ -53,7 +58,27 @@ const TEMPLATE_NAMES: Record<string, string> = {
   "A7.reminder_2h.sms": "Consult reminder, 2 hours",
   "A7.no_show.sms": "No-show rebooking",
   "A7.no_show_followup.sms": "No-show follow-up",
+  "A3.handoff.sms": "Hand-off to a person",
+  "A5.urgent.sms": "Urgent enquiry alert",
+  "A10.day30.email": "Nurture, 30 days",
+  "A10.day60.email": "Nurture, 60 days",
+  "A10.day90.email": "Nurture, 90 days",
 };
+
+const MATCH_REASONS: Record<string, string> = {
+  exact: "Same name",
+  nickname: "Nickname of the same name",
+  reordered: "Same names in a different order",
+  same_surname_initial: "Same surname and first initial",
+  similar_spelling: "Similar spelling",
+  name_contains: "One business name contains the other",
+};
+
+const CHECK_STATUS = {
+  awaiting_review: { label: "Awaiting a lawyer's review", tone: "warning" },
+  cleared: { label: "Cleared", tone: "good" },
+  conflict: { label: "Conflict recorded", tone: "critical" },
+} as const;
 
 export default async function LeadPage({ params }: { params: Promise<{ id: string }> }) {
   const { user } = await requirePermission("leads.read");
@@ -65,6 +90,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const first = touches[0];
   const last = touches.at(-1);
   const smsConsent = detail.consents.find((c) => c.channel === "sms");
+  const intake = await leadIntake(user, lead.id);
+  const open = ["new", "contacted", "consult_booked", "consult_held"].includes(lead.status);
 
   return (
     <>
@@ -83,6 +110,127 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-6">
+          <Panel>
+            <PanelHeader
+              title="Intake record"
+              description="Collected by the intake assistant (A3) or staff. Identifiers are masked."
+            />
+            {!intake.record ? (
+              <EmptyState title="No intake answers yet" />
+            ) : (
+              <PanelBody>
+                {intake.record.escalations.length > 0 ? (
+                  <Notice tone="critical" title="Escalated to a person" className="mb-3">
+                    {intake.record.escalations.join(", ")}
+                  </Notice>
+                ) : null}
+                {intake.record.outOfScope ? (
+                  <Notice tone="warning" title="Outside the firm's practice areas" className="mb-3">
+                    {intake.record.outOfScopeTopic ?? "Topic not recorded"}
+                  </Notice>
+                ) : null}
+                <dl>
+                  <DataRow label="Practice area">
+                    {intake.record.practiceArea
+                      ? PRACTICE_AREA_LABELS[intake.record.practiceArea]
+                      : "Not yet known"}
+                  </DataRow>
+                  {intake.questions.map((q) => (
+                    <DataRow key={q.id} label={q.label}>
+                      {q.value ?? (
+                        <span className="text-muted">{q.required ? "Not yet answered" : "–"}</span>
+                      )}
+                    </DataRow>
+                  ))}
+                  <DataRow label="Status">
+                    {intake.record.complete
+                      ? "Complete"
+                      : `${intake.record.missing.length} required answer(s) missing`}
+                    {intake.record.handedOffAt
+                      ? ` · handed to a person ${formatDateTime(intake.record.handedOffAt, tz)}`
+                      : ""}
+                  </DataRow>
+                </dl>
+                {intake.questions.some((q) => q.id === "respond_by" || q.id === "date_of_death") ? (
+                  <p className="mt-3 text-[12px] text-muted">{DEADLINE_NOTICE}</p>
+                ) : null}
+              </PanelBody>
+            )}
+          </Panel>
+
+          {intake.canConflicts ? (
+            <Panel>
+              <PanelHeader
+                title="Conflict pre-screen (A6)"
+                description="Possible matches against contacts and the firm's conflict list. A lawyer decides; it never clears on its own."
+              />
+              <PanelBody>
+                {!intake.conflict ? (
+                  <div className="space-y-3">
+                    <p className="text-[13px] text-muted">
+                      Not run yet. It runs when the intake record is complete.
+                    </p>
+                    {can(user, "leads.write") ? <RerunConflict leadId={lead.id} /> : null}
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <StatusLabel tone={CHECK_STATUS[intake.conflict.status].tone}>
+                        {CHECK_STATUS[intake.conflict.status].label}
+                      </StatusLabel>
+                      <span className="text-[12px] text-muted">
+                        Checked {intake.conflict.names.length} name(s){" "}
+                        {formatDateTime(intake.conflict.createdAt, tz)}
+                      </span>
+                    </div>
+                    {intake.conflict.hits.length === 0 ? (
+                      <p className="mt-3 text-[13px]">No possible matches found.</p>
+                    ) : (
+                      <Table className="mt-3">
+                        <THead>
+                          <tr>
+                            <Th>Name given</Th>
+                            <Th>Possible match</Th>
+                            <Th>Why</Th>
+                          </tr>
+                        </THead>
+                        <TBody>
+                          {intake.conflict.hits.map((h) => (
+                            <Tr key={h.id}>
+                              <Td>{h.queryName}</Td>
+                              <Td>
+                                {h.matchedName} <span className="text-muted">({h.role})</span>
+                              </Td>
+                              <Td className="text-[12.5px]">
+                                {MATCH_REASONS[h.reason] ?? h.reason} ·{" "}
+                                {Math.round(h.similarity * 100)}%
+                              </Td>
+                            </Tr>
+                          ))}
+                        </TBody>
+                      </Table>
+                    )}
+                    {intake.conflict.status !== "awaiting_review" ? (
+                      <p className="mt-3 text-[13px] text-ink-2">
+                        {intake.conflict.reviewedBy ?? "A lawyer"} ·{" "}
+                        {intake.conflict.reviewedAt
+                          ? formatDateTime(intake.conflict.reviewedAt, tz)
+                          : ""}
+                        : {intake.conflict.reviewNote}
+                      </p>
+                    ) : can(user, "conflicts.review") ? (
+                      <ConflictReview leadId={lead.id} checkId={intake.conflict.id} />
+                    ) : (
+                      <p className="mt-3 text-[13px] text-muted">
+                        Waiting for an attorney to review.
+                      </p>
+                    )}
+                  </>
+                )}
+              </PanelBody>
+            </Panel>
+          ) : null}
+
           <Panel>
             <PanelHeader
               title="Messages"
@@ -202,6 +350,86 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         </div>
 
         <div className="space-y-6">
+          {intake.record?.score !== null && intake.record?.score !== undefined ? (
+            <Panel>
+              <PanelHeader title="Score (A5)" description="Urgency, matter value and fit." />
+              <PanelBody>
+                <p className="text-2xl font-semibold tabular-nums">
+                  {intake.record.score}
+                  <span className="text-[13px] font-normal text-muted"> / 100</span>
+                  {intake.record.urgent ? (
+                    <Badge tone="critical" className="ml-2 align-middle">
+                      Urgent
+                    </Badge>
+                  ) : null}
+                </p>
+                {intake.record.breakdown ? (
+                  <dl className="mt-2">
+                    <DataRow label="Urgency">{intake.record.breakdown.urgency} / 40</DataRow>
+                    <DataRow label="Value">{intake.record.breakdown.value} / 35</DataRow>
+                    <DataRow label="Fit">{intake.record.breakdown.fit} / 25</DataRow>
+                  </dl>
+                ) : null}
+                {intake.record.breakdown?.notes.length ? (
+                  <ul className="mt-2 list-disc pl-5 text-[12.5px] text-ink-2">
+                    {intake.record.breakdown.notes.map((n) => (
+                      <li key={n}>{n}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </PanelBody>
+            </Panel>
+          ) : null}
+
+          {intake.drafts.length > 0 ? (
+            <Panel>
+              <PanelHeader title="Drafts and approvals" />
+              <ul className="divide-y divide-line">
+                {intake.drafts.map((d) => (
+                  <li key={d.id} className="px-5 py-2.5 text-[13px]">
+                    <span className="font-medium">{d.automationId}</span> · {d.title}
+                    <span className="block text-[12px] capitalize text-muted">
+                      {d.status} · {formatDateTime(d.createdAt, tz)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <PanelBody className="pt-0">
+                <Link href="/approvals" className="text-[13px] text-accent hover:underline">
+                  Open the approval queue
+                </Link>
+              </PanelBody>
+            </Panel>
+          ) : null}
+
+          {open && (can(user, "leads.decline") || can(user, "leads.write")) ? (
+            <Panel>
+              <PanelHeader title="Next steps" />
+              <PanelBody className="space-y-5">
+                {can(user, "leads.write") ? (
+                  <div>
+                    <p className="mb-2 text-[13px] font-medium">Refer out (A12)</p>
+                    {intake.referred.length > 0 ? (
+                      <p className="mb-2 text-[12.5px] text-muted">
+                        Referred to{" "}
+                        {intake.referred
+                          .map((r) => `${r.partner}${r.sentAt ? " (sent)" : " (draft)"}`)
+                          .join(", ")}
+                      </p>
+                    ) : null}
+                    <ReferOut leadId={lead.id} partners={intake.partners} />
+                  </div>
+                ) : null}
+                {can(user, "leads.decline") ? (
+                  <div>
+                    <p className="mb-2 text-[13px] font-medium">Decline (A11)</p>
+                    <DeclineLead leadId={lead.id} />
+                  </div>
+                ) : null}
+              </PanelBody>
+            </Panel>
+          ) : null}
+
           <Panel>
             <PanelHeader title="Lead" />
             <PanelBody>

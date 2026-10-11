@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { z } from "zod";
 import { env } from "@/lib/env";
+import { demoTransport } from "./demo";
 import { supportsRefusalFallback } from "./models";
 
 export type Effort = "low" | "medium" | "high";
@@ -79,8 +80,13 @@ const globalForAi = globalThis as unknown as { __lexdeskAi?: AiTransport | null 
 /** The configured transport, or null when ANTHROPIC_API_KEY is not set. */
 export function getAiTransport(): AiTransport | null {
   if (globalForAi.__lexdeskAi !== undefined) return globalForAi.__lexdeskAi;
-  const key = env().ANTHROPIC_API_KEY;
-  globalForAi.__lexdeskAi = key ? new AnthropicTransport(key) : null;
+  const e = env();
+  // Demo mode never calls a live model (rule 12): it uses rule-based stand-ins.
+  globalForAi.__lexdeskAi = e.DEMO_MODE
+    ? demoTransport()
+    : e.ANTHROPIC_API_KEY
+      ? new AnthropicTransport(e.ANTHROPIC_API_KEY)
+      : null;
   return globalForAi.__lexdeskAi;
 }
 

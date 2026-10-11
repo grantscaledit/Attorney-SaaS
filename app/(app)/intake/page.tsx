@@ -7,6 +7,8 @@ import { Stat } from "@/components/ui/stat";
 import { TBody, THead, Table, Td, Th, Tr } from "@/components/ui/table";
 import { can } from "@/lib/auth/can";
 import { requirePermission } from "@/lib/auth/session";
+import { pendingConflicts } from "@/modules/intake/ai-queries";
+import { CONFLICT_FLAGS_PENDING } from "@/modules/metrics/definitions";
 import { env } from "@/lib/env";
 import { formatCount, formatDate, formatPercent } from "@/lib/ui/format";
 import { cn } from "@/lib/ui/cn";
@@ -101,6 +103,7 @@ export default async function IntakePage({
   const d = await intakeDashboard(user, days);
   const m = INTAKE_METRICS;
   const isOwner = can(user, "firm.settings.update", { policy });
+  const conflicts = can(user, "conflicts.read", { policy }) ? await pendingConflicts(user) : null;
 
   return (
     <>
@@ -189,10 +192,14 @@ export default async function IntakePage({
           lowerIsBetter
         />
         <Stat
-          label="Conflict flags pending"
-          value="–"
-          definition="Possible conflicts found by the pre-screen that no person has reviewed yet."
-          context="The conflict pre-screen opens with AI intake."
+          label={CONFLICT_FLAGS_PENDING.label}
+          value={conflicts ? String(conflicts.flagged) : "–"}
+          definition={CONFLICT_FLAGS_PENDING.definition}
+          context={
+            conflicts
+              ? `${conflicts.unflagged} more with no matches await sign-off`
+              : "Not visible to your role."
+          }
         />
       </div>
 
@@ -225,7 +232,7 @@ export default async function IntakePage({
         />
         <BreakdownTable
           title="Leads by practice area"
-          description="From the web form answer. Calls stay unassigned until scoring arrives with AI intake."
+          description="From the web form answer or the intake assistant (A3)."
           rows={d.byPracticeArea}
           label={(k) => PRACTICE_AREA_LABELS[k] ?? k}
           filterKey="practiceArea"

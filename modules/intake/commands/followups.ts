@@ -317,7 +317,10 @@ export async function leadsDueForNurture(db: DbOrTx, now = new Date()) {
     .from(leads)
     .leftJoin(
       automationRuns,
-      and(eq(automationRuns.automationId, "A10"), eq(automationRuns.entityId, leads.id)),
+      and(
+        eq(automationRuns.automationId, "A10"),
+        eq(automationRuns.entityId, sql`${leads.id}::text`),
+      ),
     )
     .where(
       and(

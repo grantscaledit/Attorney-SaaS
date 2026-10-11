@@ -184,6 +184,8 @@ export function seeksAdvice(message: string): boolean {
       t,
     ) ||
     /\b(would|do|can|could) you (recommend|suggest|advise)\b/.test(t) ||
+    // "tell me if I should file", "wondering whether we need to pay"
+    /\b(if|whether) (i|we|my \w+) (should|need to|have to|must|ought to|can legally)\b/.test(t) ||
     /\b(how much|how long) (will|would|could|do) (i|we)\b/.test(t) ||
     /\bwhat (should|would you|do you suggest|do you recommend)\b/.test(t) ||
     /\b(your|legal) (advice|opinion|recommendation)\b/.test(t) ||
