@@ -35,8 +35,8 @@ export type MessageStatus = (typeof MESSAGE_STATUSES)[number];
  * a row is written first (unique `idempotency_key`), then a job sends it, so a
  * replayed trigger can never send twice.
  *
- * Inbound message bodies are not stored in Phase 1: they can contain
- * identifiers, and masking arrives with the AI layer in Phase 2 (rule 6).
+ * Message text is stored with identifiers masked (lib/masking, rule 6); it is
+ * the conversation transcript the intake assistant reads (spec Section 6).
  */
 export const messages = pgTable(
   "messages",
@@ -55,7 +55,7 @@ export const messages = pgTable(
     /** Set when the text came from an approved draft (spec Section 6) rather than a template. */
     approvalId: uuid("approval_id"),
     subject: text("subject"),
-    /** Rendered outbound text from an approved template. Null for inbound. */
+    /** Outbound: approved text. Inbound and staff messages: masked text. */
     body: text("body"),
     idempotencyKey: text("idempotency_key").unique(),
     scheduledFor: timestamp("scheduled_for", { withTimezone: true }),

@@ -5,7 +5,7 @@ import { execute } from "@/lib/commands/execute";
 import { getGhlClient } from "@/lib/ghl/client";
 import { normalizeGhlEvent, type GhlEvent } from "@/lib/ghl/events";
 import type { GhlContact } from "@/lib/ghl/schemas";
-import { QUEUES } from "@/lib/jobs/queue";
+import { enqueueSafely, QUEUES } from "@/lib/jobs/queue";
 import { log } from "@/lib/log";
 import {
   eventContactId,
@@ -83,4 +83,8 @@ export async function processWebhookJob(eventId: string): Promise<void> {
     return;
   }
   await dispatchQueued(result.messages);
+  // A3 calls a model, so it runs as its own job after this transaction committed.
+  for (const t of result.a3) {
+    await enqueueSafely(QUEUES.A3, t, { singletonKey: t.messageId });
+  }
 }

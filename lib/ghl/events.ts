@@ -1,5 +1,6 @@
 import type { CallOutcome } from "@/db/schema";
 import { redact } from "@/lib/log/redact";
+import { maskText } from "@/lib/masking";
 import {
   ghlAppointment,
   ghlContact,
@@ -58,6 +59,8 @@ export type GhlEvent =
       /** GHL user who sent it; set only when staff replied from GHL. */
       userId: string | null;
       occurredAt: Date;
+      /** Message text, identifiers already masked at ingestion. */
+      body: string | null;
     }
   | { kind: "form"; form: FormFacts }
   | { kind: "ignored"; reason: string };
@@ -167,6 +170,7 @@ export function normalizeGhlEvent(payload: Record<string, unknown>): GhlEvent {
       messageId: e.messageId,
       userId: e.userId,
       occurredAt,
+      body: e.body ? maskText(e.body).text : null,
     };
   }
   if (type === "LexDeskMissedCall") {
@@ -207,15 +211,9 @@ export function normalizeGhlEvent(payload: Record<string, unknown>): GhlEvent {
 }
 
 /** Keys removed from stored payloads: free text that can carry identifiers (rule 6). */
-const DROP_KEYS = new Set([
-  "body",
-  "html",
-  "message",
-  "attachments",
-  "customFields",
-  "notes",
-  "description",
-]);
+const DROP_KEYS = new Set(["html", "attachments", "customFields", "notes", "description"]);
+/** Message text is kept for the conversation transcript (spec Section 6), with identifiers masked. */
+const MASK_KEYS = new Set(["body", "message"]);
 
 function strip(value: unknown, depth = 0): unknown {
   if (depth > 8 || value === null || typeof value !== "object") return value;
@@ -223,16 +221,16 @@ function strip(value: unknown, depth = 0): unknown {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
     if (DROP_KEYS.has(k)) continue;
-    out[k] = strip(v, depth + 1);
+    out[k] = MASK_KEYS.has(k) && typeof v === "string" ? maskText(v).text : strip(v, depth + 1);
   }
   return out;
 }
 
 /**
- * The form of a payload that is safe to keep in webhook_events: message and
- * note text, custom field values and attachments removed; dates of birth, SSNs
- * and other known sensitive keys redacted. Normalization reads only fields
- * that survive this.
+ * The form of a payload that is safe to keep in webhook_events: note text,
+ * custom field values and attachments removed; message text kept with SSNs,
+ * EINs, account and card numbers and dates of birth masked (rule 6); known
+ * sensitive keys redacted. Normalization reads only fields that survive this.
  */
 export function sanitizeWebhookPayload(payload: Record<string, unknown>): Record<string, unknown> {
   return redact(strip(payload)) as Record<string, unknown>;

@@ -40,6 +40,13 @@ export const GHL_PATHS = {
   calendars: "/calendars/",
   /** GET ?locationId&calendarId&startTime&endTime (epoch millis). Scope calendars/events.readonly. */
   calendarEvents: "/calendars/events",
+  /**
+   * GET ?startDate&endDate (epoch millis, range at most 31 days)&timezone&userId.
+   * Response: map of YYYY-MM-DD to { slots: ISO datetime[] }. Source:
+   * apps/calendars.json. Scope calendars.readonly. VERIFY that slots honour
+   * the calendar's buffer and booking-notice settings.
+   */
+  freeSlots: (calendarId: string) => `/calendars/${encodeURIComponent(calendarId)}/free-slots`,
   /** POST. Scope conversations/message.write. */
   sendMessage: "/conversations/messages",
 } as const;

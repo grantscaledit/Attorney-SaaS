@@ -29,6 +29,26 @@ import {
 import { inviteUser } from "@/modules/users/commands/invite";
 import { deactivateUser, reactivateUser } from "@/modules/users/commands/set-status";
 import { updateUser } from "@/modules/users/commands/update";
+import { recordAiRun } from "@/modules/ai/commands/record-run";
+import { decideApproval } from "@/modules/approvals/commands/decide";
+import { updateAiSettings } from "@/modules/firm/commands/ai-settings";
+import { a3Handoff, a3Skipped, a3Turn } from "@/modules/intake/commands/a3";
+import {
+  addConflictParties,
+  removeConflictParty,
+  rerunConflictCheck,
+  reviewConflictCheck,
+} from "@/modules/intake/commands/conflicts";
+import {
+  a10Enroll,
+  a11Cold,
+  a8Brief,
+  declineLead,
+  referLead,
+  removeReferralPartner,
+  saveReferralPartner,
+} from "@/modules/intake/commands/followups";
+import { updateIntakeProfile } from "@/modules/users/commands/intake-profile";
 import type { AnyCommand } from "./define";
 
 /**
@@ -63,4 +83,23 @@ export const COMMANDS = [
   saveMessageTemplate,
   approveMessageTemplate,
   withdrawTemplateApproval,
+  // Phase 2: AI intake
+  recordAiRun,
+  decideApproval,
+  updateAiSettings,
+  updateIntakeProfile,
+  a3Handoff,
+  a3Turn,
+  a3Skipped,
+  rerunConflictCheck,
+  reviewConflictCheck,
+  addConflictParties,
+  removeConflictParty,
+  a8Brief,
+  a10Enroll,
+  declineLead,
+  a11Cold,
+  referLead,
+  saveReferralPartner,
+  removeReferralPartner,
 ] as const satisfies readonly AnyCommand[];

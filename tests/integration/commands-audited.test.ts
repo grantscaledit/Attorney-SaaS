@@ -11,6 +11,11 @@ import { ingestGhlWebhook } from "@/modules/ghl/commands/ingest-webhook";
 import { markGhlWebhookFailed, processGhlWebhook } from "@/modules/ghl/commands/process-webhook";
 import { claimMessage } from "@/modules/messaging/commands/outbox";
 import { setFeatureEnabled } from "@/modules/firm/commands/set-feature";
+import { recordAiRun } from "@/modules/ai/commands/record-run";
+import { addConflictParties, rerunConflictCheck } from "@/modules/intake/commands/conflicts";
+import { saveReferralPartner } from "@/modules/intake/commands/followups";
+import { conflictParties } from "@/db/schema";
+import { a3Reply, seedAppointment, seedLead, seedPendingApproval } from "./ai-kit";
 import {
   configureGhlEnv,
   daytimeZone,
@@ -86,6 +91,43 @@ async function queuedTextBack(ref: string): Promise<string> {
 }
 
 let claimedMessageId = "";
+
+const AI_RUN_INPUT = {
+  purpose: "fixture",
+  automationId: "A3",
+  model: "test-model",
+  servedModel: "test-model",
+  promptHash: "0".repeat(64),
+  promptVersion: "fixture-1",
+  status: "succeeded",
+  stopReason: "end_turn",
+  refusalCategory: null,
+  inputTokens: 10,
+  outputTokens: 5,
+  cacheReadTokens: 0,
+  costUsd: 0.0001,
+  latencyMs: 12,
+  maskedCounts: {},
+  output: { ok: true },
+  error: null,
+  entityType: null,
+  entityId: null,
+};
+
+async function aiRunId(): Promise<string> {
+  const r = (await run(recordAiRun, SYSTEM, AI_RUN_INPUT)) as { runId: string };
+  return r.runId;
+}
+
+async function partnerId(name: string): Promise<string> {
+  const r = (await run(saveReferralPartner, asUser(owner), {
+    name,
+    organization: "Example Family Law",
+    handles: "family law, divorce",
+    phone: "(214) 555-0199",
+  })) as { id: string };
+  return r.id;
+}
 
 async function makeStaff(email: string): Promise<string> {
   const r = (await run(inviteUser, asUser(owner), {
@@ -302,6 +344,173 @@ const FIXTURES: Record<string, Fixture> = {
     principal: () => asUser(owner),
     input: () => ({ key: "A2.sms" }),
     expectAction: "messaging.template_approval_withdrawn",
+  },
+  // Phase 2
+  "ai.record_run": {
+    principal: () => SYSTEM,
+    input: () => AI_RUN_INPUT,
+    expectAction: "ai.run_recorded",
+  },
+  "approvals.decide": {
+    principal: () => asUser(owner),
+    input: async () => {
+      await prepareMessaging(owner);
+      const l = await seedLead();
+      return { approvalId: await seedPendingApproval(l.leadId, l.contactId), decision: "approve" };
+    },
+    expectAction: "approvals.approved",
+  },
+  "firm.ai_settings.update": {
+    principal: () => asUser(owner),
+    input: () => ({
+      a3Mode: "review_all",
+      feeTable: [{ service: "Initial consultation", fee: "$150" }],
+    }),
+    expectAction: "firm.ai_settings.updated",
+  },
+  "users.intake_profile_update": {
+    principal: () => asUser(owner),
+    input: () => ({ userId: owner.id, practiceAreas: ["tax", "estate"] }),
+    expectAction: "users.intake_profile_updated",
+  },
+  "intake.a3_handoff": {
+    principal: () => SYSTEM,
+    input: async () => {
+      const l = await seedLead({ inbound: "The IRS put a levy on my account" });
+      return { leadId: l.leadId, messageId: l.messageId, reasons: ["levy"], adviceSeeking: false };
+    },
+    expectAction: "intake.a3_handed_off",
+  },
+  "intake.a3_turn": {
+    principal: () => SYSTEM,
+    input: async () => {
+      const l = await seedLead({ inbound: "I got a letter from the IRS" });
+      return {
+        leadId: l.leadId,
+        messageId: l.messageId,
+        aiRunId: await aiRunId(),
+        output: a3Reply({ answers: [{ questionId: "agency", value: "IRS" }] }),
+        findings: [],
+        classifierSafe: true,
+        classifierRunId: null,
+      };
+    },
+    expectAction: "intake.a3_replied",
+  },
+  "intake.a3_skipped": {
+    principal: () => SYSTEM,
+    input: async () => {
+      const l = await seedLead();
+      return { leadId: l.leadId, messageId: l.messageId, reason: "ai_not_configured" };
+    },
+    expectAction: "intake.a3_skipped",
+  },
+  "conflicts.run": {
+    principal: () => asUser(owner),
+    input: async () => ({ leadId: (await seedLead({ inbound: null })).leadId }),
+    expectAction: "conflicts.checked",
+  },
+  "conflicts.review": {
+    principal: () => asUser(owner),
+    input: async () => {
+      const l = await seedLead({ inbound: null });
+      const c = (await run(rerunConflictCheck, asUser(owner), { leadId: l.leadId })) as {
+        checkId: string;
+      };
+      return { checkId: c.checkId, decision: "cleared", note: "No overlap with current clients" };
+    },
+    expectAction: "conflicts.cleared",
+  },
+  "conflicts.parties_add": {
+    principal: () => asUser(owner),
+    input: () => ({
+      parties: [{ name: "Example Holdings LLC", kind: "organization", role: "adverse" }],
+    }),
+    expectAction: "conflicts.parties_added",
+  },
+  "conflicts.party_remove": {
+    principal: () => asUser(owner),
+    input: async () => {
+      await run(addConflictParties, asUser(owner), {
+        parties: [{ name: "Removable Party", kind: "person", role: "related" }],
+      });
+      const [p] = await db()
+        .select({ id: conflictParties.id })
+        .from(conflictParties)
+        .where(eq(conflictParties.name, "Removable Party"));
+      return { partyId: p!.id };
+    },
+    expectAction: "conflicts.party_removed",
+  },
+  "intake.a8_brief": {
+    principal: () => SYSTEM,
+    input: async () => {
+      const l = await seedLead({
+        status: "consult_booked",
+        practiceArea: "tax",
+        answers: { agency: "IRS" },
+      });
+      return {
+        appointmentId: await seedAppointment(
+          l.leadId,
+          l.contactId,
+          new Date(Date.now() + 6 * 3600_000),
+        ),
+        ai: null,
+        aiRunId: null,
+      };
+    },
+    expectAction: "intake.a8_brief_drafted",
+  },
+  "intake.a10_enroll": {
+    principal: () => SYSTEM,
+    input: async () => {
+      await prepareMessaging(owner);
+      const l = await seedLead({
+        status: "consult_held",
+        consultHeldAt: new Date(Date.now() - 8 * 86_400_000),
+      });
+      return { leadId: l.leadId };
+    },
+    expectAction: "intake.a10_enrolled",
+  },
+  "leads.decline": {
+    principal: () => asUser(owner),
+    input: async () => ({
+      leadId: (await seedLead({ status: "consult_held" })).leadId,
+      note: "Outside our current capacity",
+    }),
+    expectAction: "leads.declined",
+  },
+  "intake.a11_cold": {
+    principal: () => SYSTEM,
+    input: async () => ({
+      leadId: (
+        await seedLead({
+          status: "consult_held",
+          consultHeldAt: new Date(Date.now() - 50 * 86_400_000),
+        })
+      ).leadId,
+    }),
+    expectAction: "intake.a11_drafted",
+  },
+  "intake.refer_out": {
+    principal: () => asUser(owner),
+    input: async () => ({
+      leadId: (await seedLead()).leadId,
+      partnerId: await partnerId("Riley Referral"),
+    }),
+    expectAction: "intake.referral_drafted",
+  },
+  "referrals.partner_save": {
+    principal: () => asUser(owner),
+    input: () => ({ name: "Sam Partner", handles: "criminal defense", email: "sam@example.test" }),
+    expectAction: "referrals.partner_added",
+  },
+  "referrals.partner_remove": {
+    principal: () => asUser(owner),
+    input: async () => ({ id: await partnerId("Removable Partner") }),
+    expectAction: "referrals.partner_removed",
   },
 };
 

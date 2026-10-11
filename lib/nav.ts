@@ -12,6 +12,9 @@ export type NavItem = {
   icon:
     | "overview"
     | "intake"
+    | "approvals"
+    | "conflicts"
+    | "referrals"
     | "audit"
     | "firm"
     | "users"
@@ -33,6 +36,7 @@ export const NAV: NavSection[] = [
     items: [
       { href: "/", label: "Overview", icon: "overview", permission: "dashboard.view" },
       { href: "/intake", label: "Intake", icon: "intake", permission: "leads.read", prefix: true },
+      { href: "/approvals", label: "Approvals", icon: "approvals", permission: "approvals.read" },
     ],
   },
   {

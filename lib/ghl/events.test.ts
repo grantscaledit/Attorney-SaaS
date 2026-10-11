@@ -138,19 +138,25 @@ describe("event normalization (documented GHL event shapes)", () => {
 });
 
 describe("payload sanitizing (rule 6)", () => {
-  it("drops message text, notes and custom field values; redacts identifiers", () => {
+  it("masks message text, drops notes and custom field values, redacts identifiers", () => {
     const out = sanitizeWebhookPayload({
       type: "ContactCreate",
       id: "c1",
       dateOfBirth: "1980-01-01",
       ssn: "123-45-6789",
-      body: "call me about my levy",
+      body: "my levy notice, SSN 123-45-6789",
       customFields: [{ id: "x", value: "secret" }],
       appointment: { id: "a1", notes: "private" },
       phone: "+12145550100",
     });
     const text = JSON.stringify(out);
-    expect(text).not.toMatch(/1980|123-45|levy|secret|private/);
-    expect(out).toMatchObject({ id: "c1", phone: "+12145550100", dateOfBirth: "[REDACTED]" });
+    expect(text).not.toMatch(/1980|123-45|secret|private/);
+    expect(out).toMatchObject({
+      id: "c1",
+      phone: "+12145550100",
+      dateOfBirth: "[REDACTED]",
+      // A3 needs the words; identifiers inside them are masked to the last 4.
+      body: "my levy notice, SSN [SSN ending 6789]",
+    });
   });
 });

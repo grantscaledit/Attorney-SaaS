@@ -100,7 +100,7 @@ export const approvals = pgTable(
       .default("normal"),
     /** What the reviewer is deciding, in a few words. */
     title: text("title").notNull(),
-    channel: text("channel", { enum: ["sms", "email", "none"] }).notNull(),
+    channel: text("channel", { enum: ["sms", "email", "chat", "none"] }).notNull(),
     leadId: uuid("lead_id").references(() => leads.id),
     contactId: uuid("contact_id").references(() => contacts.id),
     appointmentId: uuid("appointment_id").references(() => appointments.id),

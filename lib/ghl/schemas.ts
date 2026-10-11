@@ -131,7 +131,7 @@ export type GhlAppointment = z.output<typeof ghlAppointment>;
 /**
  * InboundMessage / OutboundMessage webhook. For calls, `messageType` is "CALL"
  * and `status`/`callStatus` describe the outcome ("completed", "voicemail").
- * The message body is deliberately not parsed (rule 6, Phase 1).
+ * The body is masked before it is stored (rule 6).
  */
 export const ghlMessageEvent = z.object({
   type: z.enum(["InboundMessage", "OutboundMessage"]),
@@ -146,6 +146,8 @@ export const ghlMessageEvent = z.object({
   callDuration: z.number().nullish(),
   userId: text,
   dateAdded: ghlDate,
+  /** Message text. Masked before storage (lib/ghl/events.ts); never logged. */
+  body: text,
   /** Dialed firm number, when GHL includes it. VERIFY: not in the documented example. */
   to: text,
 });
@@ -243,6 +245,20 @@ export const listCalendarsResponse = z.object({
 });
 
 export const listEventsResponse = z.object({ events: z.array(ghlAppointment) });
+
+/**
+ * Free slots: a map keyed by date. Non-date keys (GHL adds e.g. traceId to
+ * some responses) are ignored rather than rejected.
+ */
+export const freeSlotsResponse = z.record(z.string(), z.unknown()).transform((map) =>
+  Object.entries(map)
+    .filter(([k]) => /^\d{4}-\d{2}-\d{2}$/.test(k))
+    .flatMap(([, v]) => {
+      const parsed = z.object({ slots: z.array(z.iso.datetime({ offset: true })) }).safeParse(v);
+      return parsed.success ? parsed.data.slots : [];
+    })
+    .sort(),
+);
 
 export const sendMessageResponse = z.object({
   conversationId: text,
