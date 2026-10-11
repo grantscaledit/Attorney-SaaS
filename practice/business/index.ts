@@ -1,3 +1,4 @@
+import { BUSINESS_MATTER_TYPES } from "./matters";
 import { dollars, type PracticeModule } from "../types";
 
 /** Business: formation, contracts, disputes, sale or purchase, ongoing counsel (spec Section 8). */
@@ -75,6 +76,7 @@ export const business: PracticeModule = {
     if (outOfState) notes.push("Entity outside Texas");
     return { urgency, value, fit: outOfState ? 15 : 25, notes };
   },
+  matterTypes: BUSINESS_MATTER_TYPES,
   promptFragment: [
     "Business matters: collect who is involved and what they need, not the merits.",
     "Always get the names of every other party to a contract, dispute or deal: they are needed for the conflict check.",

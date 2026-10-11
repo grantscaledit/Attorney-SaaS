@@ -1,3 +1,4 @@
+import type { MatterTypeDef } from "./matter-types";
 import type { PracticeArea } from "@/db/schema";
 
 /**
@@ -41,6 +42,8 @@ export type PracticeModule = {
   score: (answers: Answers, now: Date) => ScoreParts;
   /** Practice-specific guidance appended to the A3 system prompt. */
   promptFragment: string;
+  /** Matter types for this area (Phase 3). */
+  matterTypes: MatterTypeDef[];
 };
 
 /**

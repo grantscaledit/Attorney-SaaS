@@ -16,6 +16,19 @@ import { addConflictParties, rerunConflictCheck } from "@/modules/intake/command
 import { saveReferralPartner } from "@/modules/intake/commands/followups";
 import { conflictParties } from "@/db/schema";
 import { a3Reply, seedAppointment, seedLead, seedPendingApproval } from "./ai-kit";
+import { documentExtractions } from "@/db/schema";
+import { decideApproval } from "@/modules/approvals/commands/decide";
+import { applyProcessing, recordUpload } from "@/modules/documents/commands/documents";
+import { draftEngagement } from "@/modules/matters/commands/engagements";
+import { addParty, createTask } from "@/modules/matters/commands/matters";
+import {
+  clearedLead,
+  clientUser,
+  documentFor,
+  installStore,
+  openTestMatter,
+  storedPdf,
+} from "./matter-kit";
 import {
   configureGhlEnv,
   daytimeZone,
@@ -91,6 +104,73 @@ async function queuedTextBack(ref: string): Promise<string> {
 }
 
 let claimedMessageId = "";
+installStore();
+
+const NOTICE_PAGES = [
+  [
+    "Department of the Treasury",
+    "Internal Revenue Service",
+    "September 30, 2026",
+    "Notice CP2000",
+    "Tax year 2024",
+    "Amount due: $3,214.00",
+    "Respond by: October 30, 2026",
+  ],
+];
+
+/** A matter with one uploaded and processed IRS notice. */
+async function processedNotice(): Promise<{ matterId: string; documentId: string }> {
+  const m = await openTestMatter(owner);
+  const up = (await run(
+    recordUpload,
+    asUser(owner),
+    await storedPdf(m.matterId, NOTICE_PAGES),
+  )) as { documentId: string };
+  await run(applyProcessing, SYSTEM, {
+    documentId: up.documentId,
+    read: {
+      engine: "text_layer",
+      pageCount: 1,
+      unreadablePages: [],
+      confidence: null,
+      maskedText: NOTICE_PAGES[0]!.join("\n"),
+      missingPages: null,
+    },
+    classification: { docType: "irs_notice", confidence: 0.95, via: "rules" },
+    notice: {
+      fields: {
+        agency: "IRS",
+        noticeType: "CP2000",
+        taxYears: ["2024"],
+        amountDue: "3,214.00",
+        noticeDate: "2026-09-30",
+        respondBy: "2026-10-30",
+      },
+      provenance: { agency: "parser" },
+      summary: null,
+      aiRunId: null,
+    },
+  });
+  return { matterId: m.matterId, documentId: up.documentId };
+}
+
+const SIGNING_URL = "https://sign.example.test/envelope/abc123";
+
+async function draftedEngagement(
+  first: string,
+): Promise<{ engagementId: string; approvalId: string }> {
+  await prepareMessaging(owner);
+  const l = await clearedLead(owner, first);
+  return (await run(draftEngagement, asUser(owner), {
+    leadId: l.leadId,
+    practiceArea: "tax",
+    matterType: "notice_response",
+    feeTerms: "Flat fee of $2,500 for the notice response.",
+    signingUrl: SIGNING_URL,
+    provider: "manual",
+    envelopeId: null,
+  })) as { engagementId: string; approvalId: string };
+}
 
 const AI_RUN_INPUT = {
   purpose: "fixture",
@@ -512,7 +592,262 @@ const FIXTURES: Record<string, Fixture> = {
     input: async () => ({ id: await partnerId("Removable Partner") }),
     expectAction: "referrals.partner_removed",
   },
+  // Phase 3
+  "matters.open": {
+    principal: () => asUser(owner),
+    input: async () => ({
+      leadId: (await seedLead({ status: "consult_held", inbound: null })).leadId,
+      practiceArea: "tax",
+      matterType: "notice_response",
+    }),
+    expectAction: "matters.opened",
+  },
+  "matters.change_stage": {
+    principal: () => asUser(owner),
+    input: async () => ({ matterId: (await openTestMatter(owner)).matterId, stage: "documents" }),
+    expectAction: "matters.stage_changed",
+  },
+  "matters.assign": {
+    principal: () => asUser(owner),
+    input: async () => ({
+      matterId: (await openTestMatter(owner)).matterId,
+      responsibleAttorneyId: owner.id,
+      assignedUserIds: [],
+    }),
+    expectAction: "matters.assigned",
+  },
+  "matters.party_add": {
+    principal: () => asUser(owner),
+    input: async () => ({
+      matterId: (await openTestMatter(owner)).matterId,
+      name: "Example Adverse LLC",
+      kind: "organization",
+      role: "adverse",
+    }),
+    expectAction: "matters.party_added",
+  },
+  "matters.party_remove": {
+    principal: () => asUser(owner),
+    input: async () => {
+      const m = await openTestMatter(owner);
+      const r = (await run(addParty, asUser(owner), {
+        matterId: m.matterId,
+        name: "Removable Related",
+        kind: "person",
+        role: "related",
+      })) as { partyId: string };
+      return { partyId: r.partyId };
+    },
+    expectAction: "matters.party_removed",
+  },
+  "matters.note_add": {
+    principal: () => asUser(owner),
+    input: async () => ({
+      matterId: (await openTestMatter(owner)).matterId,
+      body: "Client called; SSN 123-45-6789 on file.",
+    }),
+    expectAction: "matters.note_added",
+  },
+  "tasks.create": {
+    principal: () => asUser(owner),
+    input: async () => ({
+      matterId: (await openTestMatter(owner)).matterId,
+      title: "Call the client",
+      dueOn: "2026-11-02",
+    }),
+    expectAction: "tasks.created",
+  },
+  "tasks.set_status": {
+    principal: () => asUser(owner),
+    input: async () => {
+      const m = await openTestMatter(owner);
+      const t = (await run(createTask, asUser(owner), {
+        matterId: m.matterId,
+        title: "Finish this",
+      })) as { taskId: string };
+      return { taskId: t.taskId, status: "done" };
+    },
+    expectAction: "tasks.done",
+  },
+  "portal.reissue_link": {
+    principal: () => asUser(owner),
+    input: async () => ({ matterId: (await openTestMatter(owner)).matterId }),
+    expectAction: "portal.link_reissued",
+  },
+  "documents.upload": {
+    principal: () => asUser(owner),
+    input: async () => storedPdf((await openTestMatter(owner)).matterId, NOTICE_PAGES),
+    expectAction: "documents.uploaded",
+  },
+  "documents.apply_processing": {
+    principal: () => SYSTEM,
+    input: async () => {
+      const m = await openTestMatter(owner);
+      const up = (await run(
+        recordUpload,
+        asUser(owner),
+        await storedPdf(m.matterId, [["A bank statement page", "Statement period August 2026"]]),
+      )) as { documentId: string };
+      return {
+        documentId: up.documentId,
+        read: {
+          engine: "text_layer",
+          pageCount: 1,
+          unreadablePages: [],
+          confidence: null,
+          maskedText: "Statement period August 2026",
+          missingPages: null,
+        },
+        classification: { docType: "bank_statement", confidence: 0.85, via: "rules" },
+      };
+    },
+    expectAction: "documents.processed",
+  },
+  "documents.confirm_extraction": {
+    principal: () => asUser(owner),
+    input: async () => {
+      const n = await processedNotice();
+      const [ex] = await db()
+        .select()
+        .from(documentExtractions)
+        .where(eq(documentExtractions.documentId, n.documentId));
+      return { extractionId: ex!.id, fields: ex!.fields };
+    },
+    expectAction: "documents.extraction_confirmed",
+  },
+  "documents.set_type": {
+    principal: () => asUser(owner),
+    input: async () => ({
+      documentId: (await processedNotice()).documentId,
+      docType: "correspondence",
+    }),
+    expectAction: "documents.type_set",
+  },
+  "documents.share": {
+    principal: () => asUser(owner),
+    input: async () => ({ documentId: (await processedNotice()).documentId, shared: true }),
+    expectAction: "documents.shared",
+  },
+  "documents.download": {
+    principal: () => asUser(owner),
+    input: async () => ({ documentId: (await documentFor((await processedNotice()).matterId)).id }),
+    expectAction: "documents.downloaded",
+  },
+  "matters.apply_summary": {
+    principal: () => SYSTEM,
+    input: async () => ({
+      matterId: (await openTestMatter(owner)).matterId,
+      summary: "The matter is open.",
+      timeline: [],
+      aiRunId: null,
+      trigger: "on_demand",
+    }),
+    expectAction: "matters.summary_updated",
+  },
+  "engagements.draft": {
+    principal: () => asUser(owner),
+    input: async () => {
+      await prepareMessaging(owner);
+      const l = await clearedLead(owner, "Drew");
+      return {
+        leadId: l.leadId,
+        practiceArea: "tax",
+        matterType: "notice_response",
+        feeTerms: "Flat fee of $2,500 for the notice response.",
+        signingUrl: SIGNING_URL,
+        provider: "manual",
+        envelopeId: null,
+      };
+    },
+    expectAction: "engagements.drafted",
+  },
+  "engagements.mark_signed": {
+    principal: () => asUser(owner),
+    input: async () => {
+      const e = await draftedEngagement("Morgan");
+      await run(decideApproval, asUser(owner), { approvalId: e.approvalId, decision: "approve" });
+      return { engagementId: e.engagementId };
+    },
+    expectAction: "engagements.signed",
+  },
+  "engagements.withdraw": {
+    principal: () => asUser(owner),
+    input: async () => ({
+      engagementId: (await draftedEngagement("Jesse")).engagementId,
+      reason: "Client chose another firm",
+    }),
+    expectAction: "engagements.withdrawn",
+  },
+  "engagements.remind": {
+    principal: () => SYSTEM,
+    input: async () => ({ engagementId: (await draftedEngagement("Riley")).engagementId }),
+    expectAction: "engagements.reminders_checked",
+  },
+  "matters.close": {
+    principal: () => asUser(owner),
+    input: async () => ({
+      matterId: (await openTestMatter(owner)).matterId,
+      note: "Work complete",
+    }),
+    expectAction: "matters.closed",
+  },
+  "matters.draft_status_update": {
+    principal: () => SYSTEM,
+    input: async () => ({
+      matterId: (await openTestMatter(owner)).matterId,
+      reason: "stage_change",
+      body: "Hi, a quick update on your matter.",
+      aiRunId: null,
+      findings: [],
+    }),
+    expectAction: "approvals.created",
+  },
+  "matters.apply_draft": {
+    principal: () => SYSTEM,
+    input: async () => ({
+      matterId: (await openTestMatter(owner)).matterId,
+      kind: "irs_response",
+      body: "DRAFT. Skeleton.",
+      aiRunId: null,
+      requestedBy: owner.id,
+    }),
+    expectAction: "matters.draft_prepared",
+  },
+  "questionnaires.save": {
+    principal: () => asUser(questionnaireClient!),
+    input: async () => {
+      const m = await openTestMatter(owner, {
+        practiceArea: "estate",
+        matterType: "estate_plan",
+        first: "Quinn",
+      });
+      questionnaireClient = await clientUser(m.contactId);
+      return {
+        matterId: m.matterId,
+        answers: { marital_status: "Married", children: "Two, ages 7 and 10" },
+        submit: false,
+      };
+    },
+    expectAction: "questionnaires.saved",
+  },
+  "matters.chase_documents": {
+    principal: () => SYSTEM,
+    input: async () => ({ matterId: (await openTestMatter(owner)).matterId }),
+    expectAction: "matters.chase_checked",
+  },
+  "matters.flag_stalled": {
+    principal: () => SYSTEM,
+    input: async () => ({ matterId: (await openTestMatter(owner)).matterId }),
+    expectAction: "matters.stall_checked",
+  },
+  "firm.engagement_template.update": {
+    principal: () => asUser(owner),
+    input: () => ({ template: "Dear {{clientName}}, please sign: {{signingUrl}}" }),
+    expectAction: "firm.engagement_template.updated",
+  },
 };
+
+let questionnaireClient: SessionUser | null = null;
 
 describe("every command writes an audit row", () => {
   beforeAll(async () => {

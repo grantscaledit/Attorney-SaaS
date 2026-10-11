@@ -7,6 +7,7 @@ import { log } from "@/lib/log";
 import { markStaleSend, STALE_SEND_MS } from "@/modules/messaging/commands/outbox";
 import { jobContext } from "../context";
 import { pendingA3, runA3 } from "../automations/A3";
+import { processDocument, staleDocuments } from "../documents/process";
 import { processWebhookJob } from "../ghl/process-webhook";
 import { sendMessageJob } from "../messaging/send";
 
@@ -85,12 +86,21 @@ export async function sweep(): Promise<{
     );
   }
 
-  if (events.length + due.length + stale.length + a3.length > 0) {
+  // Uploads whose processing job was lost.
+  const docs = await staleDocuments(5);
+  for (const id of docs) {
+    await processDocument(id).catch((err: unknown) =>
+      log.error("sweep document failed", { documentId: id, err }),
+    );
+  }
+
+  if (events.length + due.length + stale.length + a3.length + docs.length > 0) {
     log.info("sweep recovered work", {
       webhooks: events.length,
       sends: due.length,
       stale: stale.length,
       a3: a3.length,
+      documents: docs.length,
     });
   }
   return { webhooks: events.length, sends: due.length, stale: stale.length, a3: a3.length };

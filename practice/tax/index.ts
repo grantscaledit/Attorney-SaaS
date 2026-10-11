@@ -1,3 +1,4 @@
+import { TAX_MATTER_TYPES } from "./matters";
 import { daysUntil, dollars, yes, type PracticeModule } from "../types";
 
 /** Tax controversy: IRS and Texas Comptroller notices, collections, unfiled returns (spec Section 8). */
@@ -94,6 +95,7 @@ export const tax: PracticeModule = {
       /comptroller|irs|internal revenue|texas/i.test(a.agency ?? "") || !a.agency ? 25 : 15;
     return { urgency, value, fit, notes };
   },
+  matterTypes: TAX_MATTER_TYPES,
   promptFragment: [
     "Tax matters: ask for facts printed on the notice, not opinions about it.",
     "Never say whether the amount is right, whether penalties can be removed, or what the person should pay or file.",

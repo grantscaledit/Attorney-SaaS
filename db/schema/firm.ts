@@ -52,6 +52,11 @@ export const firmSettings = pgTable(
       .default("review_all"),
     /** GHL calendar whose free slots A3 offers. */
     consultCalendarId: text("consult_calendar_id"),
+    /**
+     * A9 engagement letter template, owned by the firm's attorney. Merge
+     * fields in {{double braces}}; see modules/matters/engagement.ts.
+     */
+    engagementTemplate: text("engagement_template"),
     /** Published fees the assistant may quote verbatim: [{ service, fee }]. */
     feeTable: jsonb("fee_table")
       .notNull()

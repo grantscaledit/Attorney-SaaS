@@ -49,6 +49,41 @@ import {
   saveReferralPartner,
 } from "@/modules/intake/commands/followups";
 import { updateIntakeProfile } from "@/modules/users/commands/intake-profile";
+import {
+  applyProcessing,
+  confirmExtraction,
+  logDownload,
+  recordUpload,
+  setDocumentType,
+  shareDocument,
+} from "@/modules/documents/commands/documents";
+import { updateEngagementTemplate } from "@/modules/firm/commands/engagement-template";
+import {
+  draftEngagement,
+  markEngagementSigned,
+  sendEngagementReminders,
+  withdrawEngagement,
+} from "@/modules/matters/commands/engagements";
+import {
+  applyDraft,
+  chaseDocuments,
+  closeMatter,
+  draftStatusUpdate,
+  flagStalled,
+  saveQuestionnaire,
+} from "@/modules/matters/commands/lifecycle";
+import {
+  addNote,
+  addParty,
+  assignMatter,
+  changeStage,
+  createTask,
+  openMatter,
+  reissuePortalLink,
+  removeParty,
+  setTaskStatus,
+} from "@/modules/matters/commands/matters";
+import { applySummary } from "@/modules/matters/commands/summary";
 import type { AnyCommand } from "./define";
 
 /**
@@ -102,4 +137,32 @@ export const COMMANDS = [
   referLead,
   saveReferralPartner,
   removeReferralPartner,
+  // Phase 3: matters and documents
+  openMatter,
+  changeStage,
+  assignMatter,
+  addParty,
+  removeParty,
+  addNote,
+  createTask,
+  setTaskStatus,
+  reissuePortalLink,
+  recordUpload,
+  applyProcessing,
+  confirmExtraction,
+  setDocumentType,
+  shareDocument,
+  logDownload,
+  applySummary,
+  draftEngagement,
+  markEngagementSigned,
+  withdrawEngagement,
+  sendEngagementReminders,
+  closeMatter,
+  draftStatusUpdate,
+  applyDraft,
+  saveQuestionnaire,
+  chaseDocuments,
+  flagStalled,
+  updateEngagementTemplate,
 ] as const satisfies readonly AnyCommand[];

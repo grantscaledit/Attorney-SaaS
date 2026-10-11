@@ -1,6 +1,16 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
-import { aiRuns, approvals, contacts, leads, OPEN_LEAD_STATUSES, referralsOut } from "@/db/schema";
+import {
+  aiRuns,
+  approvals,
+  contacts,
+  leads,
+  matters,
+  OPEN_LEAD_STATUSES,
+  referralsOut,
+} from "@/db/schema";
+import { onEngagementDecision } from "@/modules/matters/commands/engagements";
+import { scopeOf } from "@/modules/matters/scope";
 import type { AuditSpec } from "@/lib/commands/define";
 import { defineCommand } from "@/lib/commands/define";
 import { CommandError } from "@/lib/commands/errors";
@@ -43,8 +53,11 @@ export const decideApproval = defineCommand({
     if (a.status !== "pending") {
       throw new CommandError("invalid_state", `This item was already ${a.status}.`);
     }
-    // Attorneys decide on their own leads and unassigned ones (spec Section 5).
-    if (a.leadId) {
+    // Attorneys decide on their own matters and leads, and unassigned leads (spec Section 5).
+    if (a.matterId) {
+      const [m] = await ctx.tx.select().from(matters).where(eq(matters.id, a.matterId));
+      if (m) ctx.authorize("approvals.decide", { resource: await scopeOf(ctx.tx, m) });
+    } else if (a.leadId) {
       const [lead] = await ctx.tx
         .select({ assigned: leads.assignedUserId })
         .from(leads)
@@ -71,6 +84,7 @@ export const decideApproval = defineCommand({
           updatedAt: now,
         })
         .where(eq(approvals.id, a.id));
+      if (a.automationId === "A9") audit.push(...(await onEngagementDecision(ctx.tx, a.id, false)));
       audit.push({
         action: "approvals.rejected",
         entityType: "approval",
@@ -104,6 +118,14 @@ export const decideApproval = defineCommand({
             .set({ sentAt: now, updatedAt: now })
             .where(eq(referralsOut.approvalId, a.id));
         }
+      }
+      if (a.automationId === "A9") audit.push(...(await onEngagementDecision(ctx.tx, a.id, true)));
+      // A message to the client on a matter counts as client contact (B6 quiet-period clock).
+      if (a.matterId && a.channel !== "none") {
+        await ctx.tx
+          .update(matters)
+          .set({ lastClientContactAt: now })
+          .where(eq(matters.id, a.matterId));
       }
       // A sent non-engagement letter closes a lead that went cold (A11); declined leads are already closed.
       if (a.automationId === "A11" && a.leadId) {

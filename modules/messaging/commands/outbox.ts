@@ -5,7 +5,9 @@ import {
   appointments,
   approvals,
   automationRuns,
+  checklistItems,
   consents,
+  engagements,
   contacts,
   firmSettings,
   leads,
@@ -59,7 +61,9 @@ export type SuppressionReason =
   | "approval_withdrawn"
   | "no_approved_text"
   | "replied"
-  | "lead_closed";
+  | "lead_closed"
+  | "documents_received"
+  | "engagement_settled";
 
 export type QueueSpec = {
   automationId: TemplateDefinition["automationId"];
@@ -512,6 +516,28 @@ export const claimMessage = defineCommand({
         .where(eq(leads.id, m.leadId));
       if (!lead || !ctxObj.onlyWhileLeadStatus.split(",").includes(lead.status))
         reason = "lead_closed";
+    }
+    // B2 stops once every requested document has arrived.
+    if (!reason && ctxObj.onlyWhileChecklistOpen) {
+      const [open] = await ctx.tx
+        .select({ id: checklistItems.id })
+        .from(checklistItems)
+        .where(
+          and(
+            eq(checklistItems.matterId, ctxObj.onlyWhileChecklistOpen),
+            eq(checklistItems.status, "requested"),
+          ),
+        )
+        .limit(1);
+      if (!open) reason = "documents_received";
+    }
+    // A9 reminders stop once the letter is signed or withdrawn.
+    if (!reason && ctxObj.onlyWhileEngagementSent) {
+      const [e] = await ctx.tx
+        .select({ status: engagements.status })
+        .from(engagements)
+        .where(eq(engagements.id, ctxObj.onlyWhileEngagementSent));
+      if (e?.status !== "sent") reason = "engagement_settled";
     }
     if (!reason && ctxObj.cancelIfRebookedAfter && m.leadId) {
       const [rebooked] = await ctx.tx

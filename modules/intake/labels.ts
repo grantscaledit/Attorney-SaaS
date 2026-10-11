@@ -40,6 +40,8 @@ export const SUPPRESSION_LABELS: Record<string, string> = {
   rebooked: "Consult rebooked",
   replied: "The person replied",
   lead_closed: "Lead retained or closed",
+  documents_received: "Documents already received",
+  engagement_settled: "Engagement letter signed or withdrawn",
   approval_withdrawn: "Approval withdrawn",
   no_approved_text: "No approved text",
 };

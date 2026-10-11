@@ -55,6 +55,14 @@ export const envSchema = z
     MODEL_STANDARD: optionalString,
     MODEL_DEEP: optionalString,
     ALLOW_RAW_DOCUMENT_TO_LLM: booleanFromString,
+    /** The firm's own bucket (spec Section 2: one bucket per firm, SSE-KMS, versioning on). */
+    S3_BUCKET: optionalString,
+    S3_REGION: optionalString,
+    KMS_KEY_ID: optionalString,
+    /** Local file store for development, tests and demos. Never used when S3_BUCKET is set. */
+    STORAGE_DIR: optionalString,
+    /** "textract" (needs S3) or "text_layer" (PDFs with embedded text only). */
+    OCR_ENGINE: z.enum(["textract", "text_layer"]).optional(),
     SENTRY_DSN: optionalString,
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   })
@@ -65,6 +73,21 @@ export const envSchema = z
         code: "custom",
         path: ["DEMO_MODE"],
         message: "DEMO_MODE=true cannot be combined with GHL credentials",
+      });
+    }
+    if (env.S3_BUCKET && (!env.S3_REGION || !env.KMS_KEY_ID)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["S3_BUCKET"],
+        message:
+          "S3_REGION and KMS_KEY_ID are required with S3_BUCKET (documents are encrypted with the firm's key)",
+      });
+    }
+    if (env.OCR_ENGINE === "textract" && !env.S3_BUCKET) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["OCR_ENGINE"],
+        message: "textract reads documents from S3_BUCKET",
       });
     }
     if (env.GHL_PRIVATE_TOKEN && !env.GHL_LOCATION_ID) {

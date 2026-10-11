@@ -20,6 +20,9 @@ export const TEMPLATE_VARIABLES = {
   appointmentTime: "Consult date and time in the recipient's time zone",
   urgentReason: "Why an enquiry was flagged urgent (staff alerts only)",
   leadUrl: "Link to the lead in LexDesk (staff alerts only)",
+  signingUrl: "The engagement letter's e-signature link (A9)",
+  outstandingItems: "Documents still needed from the client, one per line (B2)",
+  portalUrl: "The client portal sign-in page",
 } as const;
 
 export type TemplateVariable = keyof typeof TEMPLATE_VARIABLES;
@@ -27,7 +30,7 @@ export type TemplateValues = Partial<Record<TemplateVariable, string | null>>;
 
 export type TemplateDefinition = {
   key: string;
-  automationId: "A1" | "A2" | "A3" | "A5" | "A7" | "A10";
+  automationId: "A1" | "A2" | "A3" | "A5" | "A7" | "A9" | "A10" | "B2";
   channel: Extract<MessageChannel, "sms" | "email">;
   label: string;
   /** When it sends, in plain words, for the approval screen. */
@@ -176,6 +179,49 @@ export const DEFAULT_TEMPLATES = [
       "",
       "{{firmName}}",
     ].join("\n"),
+  },
+  {
+    key: "A9.reminder.email",
+    automationId: "A9",
+    channel: "email",
+    label: "Engagement letter reminder",
+    when: "2, 4 and 7 days after the engagement letter was sent, until it is signed.",
+    subject: "Your engagement letter from {{firmName}}",
+    body: [
+      "Hi {{firstName|there}},",
+      "",
+      "This is a reminder that your engagement letter from {{firmName}} is waiting for your signature. You can review and sign it here: {{signingUrl}}",
+      "",
+      "If you have questions about the letter, reply to this email or call {{firmPhone|our office}}.",
+      "",
+      "{{firmName}}",
+    ].join("\n"),
+  },
+  {
+    key: "B2.reminder.email",
+    automationId: "B2",
+    channel: "email",
+    label: "Document reminder (email)",
+    when: "3, 7 and 14 days after documents were requested, while any are still outstanding.",
+    subject: "Documents needed for your matter with {{firmName}}",
+    body: [
+      "Hi {{firstName|there}},",
+      "",
+      "To keep your matter moving, we still need:",
+      "{{outstandingItems}}",
+      "",
+      "You can upload them securely in the client portal: {{portalUrl}}",
+      "",
+      "{{firmName}}",
+    ].join("\n"),
+  },
+  {
+    key: "B2.reminder.sms",
+    automationId: "B2",
+    channel: "sms",
+    label: "Document reminder (text)",
+    when: "With the email reminder, when the client has a mobile number and has agreed to texts.",
+    body: `{{firmName}}: we still need some documents for your matter. Please upload them in the client portal: {{portalUrl}} ${STOP}`,
   },
 ] as const satisfies readonly TemplateDefinition[];
 

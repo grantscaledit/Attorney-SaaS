@@ -78,7 +78,15 @@ export const aiRuns = pgTable(
   ],
 );
 
-export const APPROVAL_KINDS = ["message", "letter", "brief", "escalation", "referral"] as const;
+export const APPROVAL_KINDS = [
+  "message",
+  "letter",
+  "brief",
+  "escalation",
+  "referral",
+  /** B7 summaries and B8 drafting assist: internal drafts for the attorney. */
+  "draft",
+] as const;
 export type ApprovalKind = (typeof APPROVAL_KINDS)[number];
 export const APPROVAL_STATUSES = ["pending", "approved", "rejected", "superseded"] as const;
 export type ApprovalStatus = (typeof APPROVAL_STATUSES)[number];
@@ -104,6 +112,8 @@ export const approvals = pgTable(
     leadId: uuid("lead_id").references(() => leads.id),
     contactId: uuid("contact_id").references(() => contacts.id),
     appointmentId: uuid("appointment_id").references(() => appointments.id),
+    /** Phase 3: matter-level drafts (B6, B7, B8, B10, A9). No FK: matters import this file. */
+    matterId: uuid("matter_id"),
     subject: text("subject"),
     draftBody: text("draft_body").notNull(),
     finalBody: text("final_body"),
@@ -226,7 +236,9 @@ export const conflictHits = pgTable(
       .notNull()
       .references(() => conflictChecks.id),
     queryName: text("query_name").notNull(),
-    matchedType: text("matched_type", { enum: ["contact", "conflict_party"] }).notNull(),
+    matchedType: text("matched_type", {
+      enum: ["contact", "conflict_party", "matter_party"],
+    }).notNull(),
     matchedId: uuid("matched_id").notNull(),
     matchedName: text("matched_name").notNull(),
     role: text("role").notNull(),
