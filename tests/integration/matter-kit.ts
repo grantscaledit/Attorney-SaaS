@@ -8,7 +8,7 @@ import { rerunConflictCheck, reviewConflictCheck } from "@/modules/intake/comman
 import { openMatter } from "@/modules/matters/commands/matters";
 import { seedLead } from "./ai-kit";
 import { SYSTEM, asUser, run } from "./helpers";
-import { textPdf } from "./pdf";
+import { textPdf } from "../../db/seed/text-pdf";
 
 /* Phase 3 test data: synthetic clients only. */
 

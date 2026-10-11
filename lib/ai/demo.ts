@@ -86,6 +86,43 @@ export function demoTransport(): ScriptedTransport {
         },
       };
     }
+    const sys = req.system;
+    const input = req.messages[0]?.content ?? "";
+    if (sys.startsWith("You read one tax notice")) {
+      // Values left null: the deterministic parser supplies what is printed.
+      return {
+        output: {
+          agency: null,
+          noticeType: null,
+          taxYears: [],
+          amountDue: null,
+          noticeDate: null,
+          respondBy: null,
+          summary:
+            "The agency proposes changes and shows an amount due. The notice asks for a response by the date printed on it. (Demo model text.)",
+        },
+      };
+    }
+    if (sys.startsWith("You classify one document"))
+      return { output: { docType: "other", confidence: 0.2 } };
+    if (sys.startsWith("You summarize one law-firm matter")) {
+      const first = input.split("\n")[0] ?? "This matter";
+      return {
+        output: { summary: `${first} (Demo model summary from the records shown.)`, timeline: [] },
+      };
+    }
+    if (sys.startsWith("You draft a short, plain-language status update")) {
+      const stage = input.match(/^Current stage: (.+)$/m)?.[1] ?? "the current";
+      return {
+        output: {
+          body: `Hi, a quick update on your matter: it is now at the ${stage.toLowerCase()} stage. We will be in touch about next steps. If you have questions, reply to this message.`,
+        },
+      };
+    }
+    if (sys.startsWith("You prepare a first draft")) {
+      const outline = input.split("Follow this outline:\n")[1] ?? "DRAFT";
+      return { output: { body: outline } };
+    }
     return { output: intakeReply(req) };
   });
 }

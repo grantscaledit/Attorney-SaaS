@@ -88,5 +88,20 @@ envVarGroups:
         sync: false
       - key: GHL_LOCATION_ID
         sync: false
+      # AI layer (Phase 2): docs/runbooks/ai-intake.md
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # Documents (Phase 3): the firm's own bucket and KMS key, and an IAM user
+      # limited to that bucket and Textract (docs/runbooks/matters-documents.md)
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_REGION
+        sync: false
+      - key: KMS_KEY_ID
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
       - key: LOG_LEVEL
         value: info

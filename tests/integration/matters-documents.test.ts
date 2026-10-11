@@ -35,7 +35,7 @@ import { installScriptedModel, removeModel, seedLead } from "./ai-kit";
 import { configureGhlEnv, FakeGhl, prepareMessaging, RecordingQueue } from "./ghl-kit";
 import { asUser, provisionTestFirm, run, TEST_REQUEST, withFreshDatabase } from "./helpers";
 import { clearedLead, clientUser, installStore, openTestMatter } from "./matter-kit";
-import { textPdf } from "./pdf";
+import { textPdf } from "../../db/seed/text-pdf";
 
 /*
  * Phase 3 acceptance:

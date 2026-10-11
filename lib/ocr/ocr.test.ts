@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { textPdf } from "../../tests/integration/pdf";
+import { textPdf } from "../../db/seed/text-pdf";
 import { fromBlocks, sniffFileKind, TextLayerReader } from ".";
 
 describe("text layer reader", () => {

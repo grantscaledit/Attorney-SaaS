@@ -28,6 +28,7 @@ import { acceptInvite } from "@/modules/users/commands/accept-invite";
 import { inviteUser } from "@/modules/users/commands/invite";
 import { runBootstrap } from "@/scripts/lib/firm-bootstrap";
 import { seedDemoAi } from "./demo-ai";
+import { DEMO_CLIENT_EMAIL, seedDemoMatters } from "./demo-matters";
 import { seedDemoIntake } from "./demo-intake";
 import type { z } from "zod";
 
@@ -274,6 +275,18 @@ async function main(): Promise<void> {
     `  ${ai.conversations} text conversations run through the intake assistant (demo model).`,
   );
 
+  console.log("Seeding matters and the client portal…");
+  const seeded = await seedDemoMatters(asOwner);
+  // The demo client sets a password and enrolls MFA like any portal user.
+  const clientToken = new URL(seeded.clientSetupUrl).pathname.split("/").pop()!;
+  await run(
+    acceptInvite,
+    { type: "anonymous" },
+    { token: clientToken, password: DEMO_PASSWORD, confirmPassword: DEMO_PASSWORD },
+  );
+  await enrollDemoMfa(DEMO_CLIENT_EMAIL);
+  console.log(`  ${seeded.matters} matters, with portal access for ${DEMO_CLIENT_EMAIL}.`);
+
   await smokeTest(`scott@${DOMAIN}`);
 
   const otpauth = `otpauth://totp/LexDesk%20Demo?secret=${DEMO_TOTP_BASE32}&issuer=LexDesk%20Demo&digits=6&period=30`;
@@ -289,6 +302,7 @@ async function main(): Promise<void> {
     "|---|---|---|",
     `| Scott Siekierski | scott@${DOMAIN} | Owner attorney |`,
     ...STAFF.filter((p) => p.enroll).map((p) => `| ${p.name} | ${p.email} | ${p.role} |`),
+    `| Jamie Rivera | ${DEMO_CLIENT_EMAIL} | Client (portal) |`,
     "",
     ...pending.map((p) => `Pending invite for ${p.name}: ${p.url}`),
     "",
