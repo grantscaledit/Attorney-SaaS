@@ -27,6 +27,7 @@
     "provision-firm": "tsx scripts/provision-firm.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.133.0",
     "@fontsource-variable/source-serif-4": "5.3.0",
     "@fontsource/ibm-plex-mono": "5.3.0",
     "@fontsource/ibm-plex-sans": "5.3.0",

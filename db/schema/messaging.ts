@@ -52,6 +52,8 @@ export const messages = pgTable(
     /** Automation that produced it (A1, A2, A7), or null for staff and inbound messages. */
     automationId: text("automation_id"),
     templateKey: text("template_key"),
+    /** Set when the text came from an approved draft (spec Section 6) rather than a template. */
+    approvalId: uuid("approval_id"),
     subject: text("subject"),
     /** Rendered outbound text from an approved template. Null for inbound. */
     body: text("body"),

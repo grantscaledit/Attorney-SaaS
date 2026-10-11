@@ -172,6 +172,10 @@ export const leads = pgTable(
     consultHeldAt: timestamp("consult_held_at", { withTimezone: true }),
     retainedAt: timestamp("retained_at", { withTimezone: true }),
     closedAt: timestamp("closed_at", { withTimezone: true }),
+    /** Attorney responsible for the enquiry (A5 routing). */
+    assignedUserId: uuid("assigned_user_id"),
+    /** An attorney marked the enquiry declined (A11). */
+    declinedAt: timestamp("declined_at", { withTimezone: true }),
     ...timestamps,
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
