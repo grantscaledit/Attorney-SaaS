@@ -18,6 +18,7 @@ import {
   type MatterRow,
 } from "@/db/schema";
 import { assertCan, can, type Actor } from "@/lib/auth/can";
+import { pipelineMetrics } from "@/modules/metrics/definitions";
 import { matterType, stagesOf } from "@/practice";
 import { scopeOf, stageLabel } from "./scope";
 
@@ -349,3 +350,18 @@ export async function portalMatter(actor: Actor, matterId: string) {
   };
 }
 export type PortalMatter = NonNullable<Awaited<ReturnType<typeof portalMatter>>>;
+
+/** Pipeline panel numbers, from the shared definitions (modules/metrics). */
+export async function pipeline(actor: Actor) {
+  assertCan(actor, "matters.read");
+  if (actor.role === "client") throw new Error("not for portal users");
+  return pipelineMetrics(getDb(), (m) =>
+    stageFacts({
+      practiceArea: m.practiceArea as MatterRow["practiceArea"],
+      matterType: m.matterType,
+      stage: m.stage,
+      status: "open",
+      stageChangedAt: new Date(Date.now() - m.daysInStage * DAY),
+    }),
+  );
+}

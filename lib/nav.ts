@@ -16,6 +16,9 @@ export type NavItem = {
     | "conflicts"
     | "referrals"
     | "ai"
+    | "matters"
+    | "pipeline"
+    | "letter"
     | "audit"
     | "firm"
     | "users"
@@ -37,6 +40,14 @@ export const NAV: NavSection[] = [
     items: [
       { href: "/", label: "Overview", icon: "overview", permission: "dashboard.view" },
       { href: "/intake", label: "Intake", icon: "intake", permission: "leads.read", prefix: true },
+      {
+        href: "/matters",
+        label: "Matters",
+        icon: "matters",
+        permission: "matters.read",
+        prefix: true,
+      },
+      { href: "/pipeline", label: "Pipeline", icon: "pipeline", permission: "matters.read" },
       { href: "/approvals", label: "Approvals", icon: "approvals", permission: "approvals.read" },
     ],
   },
@@ -67,6 +78,12 @@ export const NAV: NavSection[] = [
         href: "/settings/ai",
         label: "AI intake",
         icon: "ai",
+        permission: "firm.settings.read",
+      },
+      {
+        href: "/settings/engagement",
+        label: "Engagement letter",
+        icon: "letter",
         permission: "firm.settings.read",
       },
       {

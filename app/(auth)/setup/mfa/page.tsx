@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { requireSession } from "@/lib/auth/session";
+import { requireAnySession } from "@/lib/auth/session";
 import { MfaEnrollment } from "./mfa-enrollment";
 
 export const metadata: Metadata = { title: "Set up two-step verification" };
 
 export default async function MfaSetupPage() {
-  const { user } = await requireSession({ allowPendingMfa: true });
+  const { user } = await requireAnySession({ allowPendingMfa: true });
   if (user.twoFactorEnabled) redirect("/");
   return (
     <>

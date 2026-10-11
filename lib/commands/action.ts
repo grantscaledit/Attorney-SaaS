@@ -1,7 +1,7 @@
 import "server-only";
 import { unstable_rethrow } from "next/navigation";
 import type { z } from "zod";
-import { requireSession } from "@/lib/auth/session";
+import { requireClient, requireSession } from "@/lib/auth/session";
 import { log } from "@/lib/log";
 import { getRequestMeta } from "@/lib/request-context";
 import type { Command, Principal } from "./define";
@@ -20,14 +20,14 @@ export type { ActionState } from "./action-state";
 export async function runCommand<S extends z.ZodType, R>(
   command: Command<S, R>,
   input: unknown,
-  options: { anonymous?: boolean; successMessage?: string } = {},
+  options: { anonymous?: boolean; portal?: boolean; successMessage?: string } = {},
 ): Promise<ActionState<R>> {
   const request = await getRequestMeta();
   let principal: Principal;
   if (options.anonymous) {
     principal = { type: "anonymous" };
   } else {
-    const session = await requireSession();
+    const session = options.portal ? await requireClient() : await requireSession();
     principal = { type: "user", user: session.user };
   }
 
