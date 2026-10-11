@@ -237,7 +237,7 @@ export function checkDraft(draft: string, feeTable: readonly FeeEntry[] = []): D
     findings.add("advice");
   }
   if (
-    /\byou (will|won't|will not|would|wouldn't|are (likely|unlikely) to|are going to|stand to) (win|lose|owe|go to jail|be (charged|penalized|liable|fine|approved|denied|forgiven|prosecuted|audited))\b/.test(
+    /\byou (will|won't|will not|would|wouldn't|are (likely|unlikely) to|are going to|stand to) (?:(?:definitely|certainly|surely|probably|likely|almost certainly|most likely|easily) )?(win|lose|owe|go to jail|be (charged|penalized|liable|fine|approved|denied|forgiven|prosecuted|audited))\b/.test(
       t,
     ) ||
     /\b(good|high|low|strong|excellent) (chance|chances|odds|likelihood)\b/.test(t) ||

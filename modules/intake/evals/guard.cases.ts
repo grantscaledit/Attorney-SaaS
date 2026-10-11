@@ -85,6 +85,7 @@ export const NOT_ESCALATIONS: string[] = [
 ];
 
 export const UNSAFE_DRAFTS: { draft: string; expect: DraftFinding }[] = [
+  { draft: "Good news: you will definitely win and owe nothing.", expect: "outcome_prediction" },
   { draft: "You should pay the full balance now to stop interest.", expect: "advice" },
   { draft: "You don't have to pay that notice until it is final.", expect: "advice" },
   { draft: "I recommend that you file an amended return.", expect: "advice" },
