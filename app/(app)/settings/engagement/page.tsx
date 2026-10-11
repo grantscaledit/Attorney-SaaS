@@ -20,8 +20,8 @@ export default async function EngagementTemplatePage() {
       />
       {!firm.engagementTemplate ? (
         <Notice tone="warning" className="mb-5" title="Using the product default">
-          The default letter is a starting point, not the firm's terms. Have the firm's attorney
-          review it or paste the firm's own letter.
+          The default letter is a starting point, not the firm&apos;s terms. Have the firm&apos;s attorney
+          review it or paste the firm&apos;s own letter.
         </Notice>
       ) : null}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
