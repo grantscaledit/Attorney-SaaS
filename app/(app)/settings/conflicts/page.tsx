@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "Conflict list" };
 const ROLES = { client: "Client", adverse: "Adverse party", related: "Related party" } as const;
 
 export default async function ConflictListPage() {
-  const { user } = await requirePermission("firm.settings.read");
+  const { user } = await requirePermission("conflicts.read");
   const parties = await listConflictParties(user);
   const canEdit = can(user, "firm.settings.update");
   return (

@@ -146,8 +146,9 @@ export async function pendingConflicts(actor: Actor) {
   return conflictFlagsPending(getDb());
 }
 
+/** Names on the conflict list are client information: staff who work leads only, not billing. */
 export async function listConflictParties(actor: Actor) {
-  assertCan(actor, "firm.settings.read");
+  assertCan(actor, "conflicts.read");
   return getDb()
     .select()
     .from(conflictParties)

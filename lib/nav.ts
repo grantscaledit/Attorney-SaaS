@@ -73,7 +73,7 @@ export const NAV: NavSection[] = [
         href: "/settings/conflicts",
         label: "Conflict list",
         icon: "conflicts",
-        permission: "firm.settings.read",
+        permission: "conflicts.read",
       },
       {
         href: "/settings/referrals",
