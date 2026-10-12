@@ -22,7 +22,7 @@ import { firmToday, scopeOf } from "@/modules/matters/scope";
 import { matterVisibility } from "@/modules/matters/queries";
 import { deadlineCounts } from "@/modules/metrics/definitions";
 import { allRuleSeeds, eventsFor, paramsOfSeed } from "@/practice";
-import { addDays } from "./date-math";
+import { addDays, weekday } from "./date-math";
 import { ruleHash, rulesForEvent, verificationOf } from "./engine";
 import { feedTokenHash } from "./commands/calendar";
 import { renderCalendar, type FeedEvent } from "./ics";
@@ -90,12 +90,15 @@ export async function deadlinesPanel(actor: Actor, opts: { month: string; mine: 
   const db = getDb();
   const today = firmToday();
   const vis = await matterVisibility(actor);
+  // The month grid starts on the Sunday on or before the 1st and shows six weeks.
+  const first = `${opts.month}-01`;
+  const gridStart = addDays(first, -weekday(first));
   const [counts, upcoming, calendar, audit] = await Promise.all([
     deadlineCounts(db, today, vis),
     listDeadlines(actor, { to: addDays(today, 90), ownerId: opts.mine ? actor.id : undefined }),
     listDeadlines(actor, {
-      from: `${opts.month}-01`,
-      to: addDays(`${opts.month}-01`, 41),
+      from: gridStart,
+      to: addDays(gridStart, 41),
       ownerId: opts.mine ? actor.id : undefined,
     }),
     deadlineAuditReport(db),
@@ -108,6 +111,7 @@ export async function deadlinesPanel(actor: Actor, opts: { month: string; mine: 
     visibleIds ? xs.filter((x) => visibleIds.has(x.matterId)) : xs;
   return {
     today,
+    gridStart,
     counts,
     upcoming,
     calendar,

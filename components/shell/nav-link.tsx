@@ -4,8 +4,11 @@ import type { Route } from "next";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  CalendarClock,
+  CalendarSync,
   CheckSquare,
   FileClock,
+  Scale,
   Handshake,
   Sparkles,
   Briefcase,
@@ -41,6 +44,9 @@ const ICONS = {
   integrations: Plug,
   templates: MessageSquareText,
   security: Fingerprint,
+  deadlines: CalendarClock,
+  rules: Scale,
+  calendar: CalendarSync,
 } as const;
 
 export function NavLink({ item }: { item: Pick<NavItem, "href" | "label" | "icon" | "prefix"> }) {

@@ -24,6 +24,7 @@ import { DRAFT_KINDS } from "@/modules/matters/drafts";
 import { matterDetail } from "@/modules/matters/queries";
 import { ESTATE_QUESTIONNAIRE } from "@/modules/matters/questionnaire";
 import { DOC_TYPE_LABELS, DOC_TYPES, type DocType } from "@/practice";
+import { DeadlinesSection } from "./deadlines-section";
 import {
   AssignForm,
   CloseMatter,
@@ -119,6 +120,8 @@ export default async function MatterPage({ params }: { params: Promise<{ id: str
               </div>
             </PanelBody>
           </Panel>
+
+          <DeadlinesSection actor={user} matter={m} staff={d.staff} />
 
           <Panel>
             <PanelHeader
