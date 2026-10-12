@@ -30,6 +30,8 @@ export const ACTIONS = [
   "conflicts.review",
   /** Decline to take a lead on (A11). Lawyers only: the firm's decision not to represent. */
   "leads.decline",
+  /** Mark a lead retained and draft the engagement letter (A9). Lawyers only. */
+  "leads.retain",
   // Matters and documents (Phase 3)
   "matters.read",
   "matters.write",
@@ -108,6 +110,7 @@ const POLICY: Record<Role, Partial<Record<Action, Rule>>> = {
     "conflicts.read": true,
     "conflicts.review": true,
     "leads.decline": true,
+    "leads.retain": true,
     "matters.read": ownOrAssignedMatter,
     "matters.write": ownOrAssignedMatter,
     "documents.read": ownOrAssignedMatter,

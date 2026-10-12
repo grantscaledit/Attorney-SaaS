@@ -16,6 +16,18 @@ export const QUEUES = {
   A3: "automation.A3",
   A7: "automation.A7",
   A8: "automation.A8",
+  /** B4 classification and B3 notice triage for one uploaded document. */
+  documentProcess: "documents.process",
+  /** B7 summary for one matter. */
+  matterSummary: "matters.summary",
+  /** B6 client status update draft. */
+  matterStatusUpdate: "matters.status_update",
+  /** B8 drafting assist. */
+  matterDraft: "matters.draft",
+  /** B2, B5, B6 (no contact), A9 reminders: once a day. */
+  mattersDaily: "matters.daily",
+  /** B7 weekly summaries. */
+  mattersWeekly: "matters.weekly",
   /** A10 nurture enrolment and A11 cold-lead letters. */
   intakeDaily: "automation.intake_daily",
 } as const;

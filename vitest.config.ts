@@ -1,6 +1,10 @@
 import { defineConfig } from "vitest/config";
 
-const alias = { "@": import.meta.dirname };
+const alias = {
+  "@": import.meta.dirname,
+  // Next.js resolves "server-only" to an empty module on the server; tests run server code directly.
+  "server-only": `${import.meta.dirname}/tests/server-only.ts`,
+};
 
 export default defineConfig({
   test: {

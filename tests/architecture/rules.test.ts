@@ -62,6 +62,18 @@ describe("authorization: every entry point checks the session", () => {
     expect(unguarded).toEqual([]);
   });
 
+  it("every portal page and server action checks for a client session", () => {
+    const files = source.filter(
+      (f) =>
+        rel(f).startsWith("app/(portal)/") &&
+        (/page\.tsx$/.test(f) || /^["']use server["']/.test(read(f).trimStart())),
+    );
+    const unguarded = files
+      .filter((f) => !/\b(requireClient\(|portal: true)/.test(read(f)))
+      .map(rel);
+    expect(unguarded).toEqual([]);
+  });
+
   it("every API route except auth, health and webhooks checks the session", () => {
     const PUBLIC = new Set(["app/api/auth/[...all]/route.ts", "app/api/health/route.ts"]);
     const routes = source.filter(
@@ -71,7 +83,7 @@ describe("authorization: every entry point checks the session", () => {
         !rel(f).startsWith("app/api/webhooks/"),
     );
     const unguarded = routes
-      .filter((f) => !/\brequire(Session|User|Permission)\(/.test(read(f)))
+      .filter((f) => !/\brequire(Session|User|Permission|AnySession)\(/.test(read(f)))
       .map(rel);
     expect(unguarded).toEqual([]);
   });

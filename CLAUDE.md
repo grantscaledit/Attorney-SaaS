@@ -91,3 +91,8 @@ pnpm provision-firm --help
   Deterministic safety checks live in `lib/ai/guard.ts` with golden cases in
   `modules/*/evals/`; add a case for every bug. Tests use `ScriptedTransport`; demo mode uses
   `lib/ai/demo.ts` and never calls a live model. Design: ADR 0007.
+- Matters and documents (ADR 0008): matter types, stages and checklists live in
+  `practice/<area>/matters.ts`. Every matter read filters rows in SQL as well as calling `can()`
+  with `scopeOf(matter)`. Files go through `lib/storage` (never the filesystem directly) under
+  keys without client data; text goes through `lib/ocr`, then `maskText`, before anything else
+  sees it. Portal pages call `requireClient()`; staff pages never serve clients.

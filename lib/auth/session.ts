@@ -74,7 +74,7 @@ type RequireOptions = {
  * Gate for every authenticated page and server action. Redirects to sign-in,
  * MFA enrollment, or an access page; never returns a partial session.
  */
-export async function requireSession(options: RequireOptions = {}): Promise<CurrentSession> {
+async function loadSession(options: RequireOptions): Promise<CurrentSession> {
   const raw = await getRawSession();
   if (!raw) redirect("/sign-in");
 
@@ -92,9 +92,6 @@ export async function requireSession(options: RequireOptions = {}): Promise<Curr
 
   if (!user.twoFactorEnabled && !options.allowPendingMfa) redirect("/setup/mfa");
 
-  // The staff app is not for portal clients or vendor accounts.
-  if (user.role === "client" || user.role === "vendor_support") forbidden();
-
   return {
     user,
     sessionId: raw.session.id,
@@ -102,6 +99,28 @@ export async function requireSession(options: RequireOptions = {}): Promise<Curr
     expiresAt: new Date(raw.session.expiresAt),
     policy,
   };
+}
+
+/** Staff app gate. Portal clients are sent to the portal; vendor accounts have no access. */
+export async function requireSession(options: RequireOptions = {}): Promise<CurrentSession> {
+  const session = await loadSession(options);
+  if (session.user.role === "client") redirect("/portal");
+  if (session.user.role === "vendor_support") forbidden();
+  return session;
+}
+
+/** Client portal gate (Phase 3): portal clients only; staff are sent to the staff app. */
+export async function requireClient(options: RequireOptions = {}): Promise<CurrentSession> {
+  const session = await loadSession(options);
+  if (session.user.role !== "client") redirect("/");
+  return session;
+}
+
+/** Routes both staff and clients use (document download, upload). Permission is checked per resource. */
+export async function requireAnySession(options: RequireOptions = {}): Promise<CurrentSession> {
+  const session = await loadSession(options);
+  if (session.user.role === "vendor_support") forbidden();
+  return session;
 }
 
 export async function requireUser(options: RequireOptions = {}): Promise<CurrentUser> {

@@ -228,3 +228,120 @@ export function previousPeriod(p: Period): Period {
 export function lastDays(days: number, now = new Date()): Period {
   return { from: new Date(now.getTime() - days * 86_400_000), to: now };
 }
+
+/*
+ * Pipeline panel (spec Section 9): open matters by type and stage, days in
+ * stage against the stage threshold, matters waiting on the client, unsigned
+ * engagement letters, checklist completion. Point in time, not per period.
+ * Stage thresholds and "waiting on client" come from the practice modules.
+ */
+export const PIPELINE_METRICS = {
+  open: { label: "Open matters", definition: "Matters with status open." },
+  stalled: {
+    label: "Past stage threshold",
+    definition:
+      "Open matters that have been in their current stage longer than the stage's threshold (the B5 stalled-matter rule).",
+  },
+  waitingOnClient: {
+    label: "Waiting on client",
+    definition:
+      "Open matters in a stage where the firm waits on the client, such as gathering documents or reviewing drafts.",
+  },
+  unsignedEngagements: {
+    label: "Unsigned engagement letters",
+    definition: "Engagement letters sent to the client (A9) and not yet signed or withdrawn.",
+  },
+  checklistCompletion: {
+    label: "Checklist completion",
+    definition:
+      "Required checklist documents received, as a share of all required documents on open matters. Waived items are excluded.",
+  },
+} as const;
+
+export type PipelineMetrics = {
+  open: number;
+  stalled: number;
+  waitingOnClient: number;
+  unsignedEngagements: number;
+  checklist: { received: number; required: number; rate: number | null };
+  byStage: {
+    practiceArea: string;
+    matterType: string;
+    stage: string;
+    matters: number;
+    stalled: number;
+    avgDaysInStage: number;
+  }[];
+};
+
+export async function pipelineMetrics(
+  db: DbOrTx,
+  classify: (m: {
+    practiceArea: string;
+    matterType: string;
+    stage: string;
+    daysInStage: number;
+  }) => { stalled: boolean; waitingOnClient: boolean },
+): Promise<PipelineMetrics> {
+  const rows = (
+    await db.execute<{ practice_area: string; matter_type: string; stage: string; days: number }>(
+      sql`select practice_area, matter_type, stage, floor(extract(epoch from now() - stage_changed_at) / 86400)::int as days
+          from matters where status = 'open' and deleted_at is null`,
+    )
+  ).rows;
+  const [eng] = (
+    await db.execute<{ n: number }>(
+      sql`select count(*)::int as n from engagements where status = 'sent'`,
+    )
+  ).rows;
+  const [cl] = (
+    await db.execute<{ received: number; required: number }>(
+      sql`select count(*) filter (where c.status = 'received')::int as received,
+                 count(*) filter (where c.status in ('received', 'requested'))::int as required
+          from checklist_items c join matters m on m.id = c.matter_id
+          where m.status = 'open' and m.deleted_at is null and c.required`,
+    )
+  ).rows;
+  const groups = new Map<string, PipelineMetrics["byStage"][number] & { totalDays: number }>();
+  let stalled = 0;
+  let waiting = 0;
+  for (const r of rows) {
+    const c = classify({
+      practiceArea: r.practice_area,
+      matterType: r.matter_type,
+      stage: r.stage,
+      daysInStage: r.days,
+    });
+    if (c.stalled) stalled++;
+    if (c.waitingOnClient) waiting++;
+    const key = `${r.practice_area}|${r.matter_type}|${r.stage}`;
+    const g = groups.get(key) ?? {
+      practiceArea: r.practice_area,
+      matterType: r.matter_type,
+      stage: r.stage,
+      matters: 0,
+      stalled: 0,
+      avgDaysInStage: 0,
+      totalDays: 0,
+    };
+    g.matters++;
+    g.totalDays += r.days;
+    if (c.stalled) g.stalled++;
+    groups.set(key, g);
+  }
+  return {
+    open: rows.length,
+    stalled,
+    waitingOnClient: waiting,
+    unsignedEngagements: eng?.n ?? 0,
+    checklist: {
+      received: cl?.received ?? 0,
+      required: cl?.required ?? 0,
+      rate: cl && cl.required > 0 ? cl.received / cl.required : null,
+    },
+    byStage: [...groups.values()].map(({ totalDays, ...g }) => ({
+      ...g,
+      avgDaysInStage: Math.round(totalDays / g.matters),
+    })),
+  };
+}

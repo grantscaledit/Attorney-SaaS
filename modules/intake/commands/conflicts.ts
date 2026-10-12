@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, eq, isNull, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import type { Tx } from "@/db/client";
 import {
@@ -10,6 +10,8 @@ import {
   contacts,
   intakeRecords,
   leads,
+  matterParties,
+  matters,
 } from "@/db/schema";
 import type { AuditSpec } from "@/lib/commands/define";
 import { defineCommand } from "@/lib/commands/define";
@@ -52,7 +54,12 @@ export function namesForLead(
   });
 }
 
-type Candidate = { type: "contact" | "conflict_party"; id: string; name: string; role: string };
+type Candidate = {
+  type: "contact" | "conflict_party" | "matter_party";
+  id: string;
+  name: string;
+  role: string;
+};
 
 async function candidatesFor(tx: Tx, name: string, selfContactId: string): Promise<Candidate[]> {
   const q = normalizeName(name);
@@ -86,14 +93,43 @@ async function candidatesFor(tx: Tx, name: string, selfContactId: string): Promi
     .where(and(isNull(conflictParties.deletedAt), near(sql`${conflictParties.name}`)))
     .limit(50);
 
+  // Parties on the firm's matters (Phase 3): adverse parties, spouses, co-owners, decedents.
+  const matterPartyRows = await tx
+    .select({
+      id: matterParties.id,
+      name: matterParties.name,
+      role: matterParties.role,
+      number: matters.number,
+    })
+    .from(matterParties)
+    .innerJoin(matters, eq(matters.id, matterParties.matterId))
+    .where(
+      and(
+        isNull(matterParties.deletedAt),
+        ne(matterParties.role, "client"),
+        or(isNull(matterParties.contactId), ne(matterParties.contactId, selfContactId)),
+        near(sql`${matterParties.name}`),
+      ),
+    )
+    .limit(50);
+
   const out: Candidate[] = [];
   for (const c of contactRows) {
     const role = c.client ? "client" : "prior enquiry";
     if (c.fullName) out.push({ type: "contact", id: c.id, name: c.fullName, role });
     if (c.companyName) out.push({ type: "contact", id: c.id, name: c.companyName, role });
   }
-  for (const p of partyRows)
+  for (const p of partyRows) {
     out.push({ type: "conflict_party", id: p.id, name: p.name, role: p.role });
+  }
+  for (const p of matterPartyRows) {
+    out.push({
+      type: "matter_party",
+      id: p.id,
+      name: p.name,
+      role: `${p.role.replace("_", " ")} on matter ${p.number}`,
+    });
+  }
   return out;
 }
 

@@ -11,6 +11,7 @@ export type NewApproval = {
   leadId?: string | null;
   contactId?: string | null;
   appointmentId?: string | null;
+  matterId?: string | null;
   subject?: string | null;
   draftBody: string;
   sources?: Record<string, unknown>;
@@ -67,6 +68,7 @@ export async function createApproval(
       leadId: a.leadId ?? null,
       contactId: a.contactId ?? null,
       appointmentId: a.appointmentId ?? null,
+      matterId: a.matterId ?? null,
       subject: a.subject ?? null,
       draftBody: a.draftBody,
       sources: a.sources ?? null,

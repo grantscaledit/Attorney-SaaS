@@ -3,12 +3,64 @@
 Spec Section 11. A phase closes only when its acceptance criteria pass, tests are green, the demo
 seed is updated and its runbook entry exists.
 
-| Phase                         | Status                                                        |
-| ----------------------------- | ------------------------------------------------------------- |
-| 0. Foundation                 | Complete, pending review                                      |
-| 1. GHL sync and intake basics | Complete, pending review and live GHL verification            |
-| 2. AI intake                  | Complete, pending review, attorney review and live model eval |
-| 3-8, V2                       | Not started                                                   |
+| Phase                         | Status                                                             |
+| ----------------------------- | ------------------------------------------------------------------ |
+| 0. Foundation                 | Complete, pending review                                           |
+| 1. GHL sync and intake basics | Complete, pending review and live GHL verification                 |
+| 2. AI intake                  | Complete, pending review, attorney review and live model eval      |
+| 3. Matters and documents      | Complete, pending review, attorney review and storage verification |
+| 4-8, V2                       | Not started                                                        |
+
+## Phase 3: Matters and documents
+
+Scope: matters, stages, tasks, client portal, storage, B1-B10, A9, Pipeline panel. Design: ADR 0008. Setup and use: `docs/runbooks/matters-documents.md`.
+
+### Acceptance criteria and evidence
+
+| Criterion                                                                                                  | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A sample IRS notice uploads, extracts correct fields with identifiers masked, and creates a matter summary | `tests/integration/matters-documents.test.ts`: a CP2000 PDF containing a full SSN, a bank account and a routing number goes through the real upload service, storage, the PDF text reader, masking, B4 and B3. The test checks the extracted fields (agency, notice, tax year, amount, notice date, respond-by date), that no full identifier is stored anywhere or sent to the model, the review and respond-by tasks, and the B7 matter summary. It runs with the model and without it. Model values not printed on the notice are ignored. A 21-case B3 eval (`modules/documents/evals`) runs on every build. `e2e/phase3.spec.ts` confirms the fields in the browser |
+| Client sees only their own matter                                                                          | The same test file covers: portal list and matter page, uploads, downloads and questionnaire for another client's matter (refused); staff-only documents hidden on the client's own matter; the staff matter page unavailable to clients; attorneys limited to their own and assigned matters. In the browser, the client sees one matter and is redirected away from staff pages                                                                                                                                                                                                                                                                                        |
+
+### Also delivered
+
+- Storage in the firm's S3 bucket (SSE-KMS, 5-minute signed URLs, file type read from the bytes,
+  25 MB limit) with every download audited. OCR uses Textract, or the PDF text layer.
+- A9:
+  - requires a cleared conflict pre-screen;
+  - the letter comes from the firm's template (Settings > Engagement letter) and is approved
+    before sending;
+  - provider-neutral e-sign (the manual provider takes a pasted signing link);
+  - reminders on days 2, 4 and 7;
+  - signing opens the matter.
+- B1 checklist and portal access; B2 reminders that stop when the documents arrive; B4 naming
+  and quality flags; B5 stall tasks; B6 client updates for approval; B7 cited summaries; B8
+  drafts labelled DRAFT; B9 portal questionnaire (masked, ages not dates of birth); B10 closing
+  letter, retention date and document return.
+- A6 now also checks parties on the firm's matters.
+- UI:
+  - Matters list and matter page;
+  - lead page Retain;
+  - client portal;
+  - Pipeline panel (definitions in `modules/metrics`);
+  - engagement letter settings.
+- Demo seed: five matters, including a client (Jamie Rivera) who went through A9 and has portal
+  access, and a triaged IRS notice.
+
+### Open items and VERIFY
+
+- **Storage**: create the bucket, key and IAM user. Then verify in staging that Textract can read
+  KMS-encrypted objects and that signed URLs expire.
+- **Attorney review**:
+  - the default engagement letter;
+  - the closing letter;
+  - the B8 skeletons;
+  - matter types, stage thresholds, checklists and retention years;
+  - the B9 questionnaire wording;
+  - the 21 B3 notice layouts against real notices.
+- Deadlines read from notices are tasks until Phase 4's deadline engine (C1).
+- Scanned uploads need Textract; without it only PDFs with a text layer are read.
+- The live-model evals (Phase 2) are still to be run with a key.
 
 ## Phase 2: AI intake
 

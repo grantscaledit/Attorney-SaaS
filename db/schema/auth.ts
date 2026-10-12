@@ -43,6 +43,8 @@ export const users = pgTable(
       .array()
       .notNull()
       .default(sql`'{}'`),
+    /** Portal clients only: the contact this login belongs to (Phase 3). */
+    contactId: uuid("contact_id"),
     twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
     ...timestamps,
     deletedAt: timestamp("deleted_at", { withTimezone: true }),

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -29,7 +29,15 @@ import { leadDetail } from "@/modules/intake/queries";
 import { leadIntake } from "@/modules/intake/ai-queries";
 import { can } from "@/lib/auth/can";
 import { DEADLINE_NOTICE } from "@/modules/intake/commands/followups";
-import { ConflictReview, DeclineLead, ReferOut, RerunConflict } from "./intake-actions";
+import { PRACTICE_MODULES } from "@/practice";
+import {
+  ConflictReview,
+  DeclineLead,
+  EngagementActions,
+  ReferOut,
+  RerunConflict,
+  RetainForm,
+} from "./intake-actions";
 
 export const metadata: Metadata = { title: "Lead" };
 
@@ -398,6 +406,55 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
                 <Link href="/approvals" className="text-[13px] text-accent hover:underline">
                   Open the approval queue
                 </Link>
+              </PanelBody>
+            </Panel>
+          ) : null}
+
+          {intake.matter ? (
+            <Notice tone="good" title={`Matter ${intake.matter.number}`}>
+              <Link href={`/matters/${intake.matter.id}` as Route} className="underline">
+                Open the matter
+              </Link>
+            </Notice>
+          ) : null}
+
+          {open && can(user, "leads.retain") && !intake.matter ? (
+            <Panel>
+              <PanelHeader
+                title="Engagement (A9)"
+                description="Needs a cleared conflict pre-screen. The letter waits in Approvals; reminders follow on days 2, 4 and 7."
+              />
+              <PanelBody>
+                {intake.engagement && intake.engagement.status !== "withdrawn" ? (
+                  <div className="space-y-2 text-[13px]">
+                    <p>
+                      Letter <span className="font-medium">{intake.engagement.status}</span>
+                      {intake.engagement.sentAt
+                        ? ` ${formatDateTime(intake.engagement.sentAt, tz)}`
+                        : ""}
+                      .
+                      {intake.engagement.status === "drafted"
+                        ? " Approve it in Approvals to send it."
+                        : ""}
+                    </p>
+                    <EngagementActions
+                      leadId={lead.id}
+                      engagementId={intake.engagement.id}
+                      status={intake.engagement.status}
+                    />
+                  </div>
+                ) : (
+                  <RetainForm
+                    leadId={lead.id}
+                    signerName={name}
+                    signerEmail={contact?.email ?? null}
+                    areas={Object.values(PRACTICE_MODULES).map((p) => ({
+                      area: p.area,
+                      label: p.label,
+                      types: p.matterTypes.map((t) => ({ key: t.key, label: t.label })),
+                    }))}
+                  />
+                )}
               </PanelBody>
             </Panel>
           ) : null}

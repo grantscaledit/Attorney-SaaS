@@ -7,6 +7,8 @@ import {
   conflictChecks,
   conflictHits,
   conflictParties,
+  engagements,
+  matters,
   intakeRecords,
   referralPartners,
   referralsOut,
@@ -88,7 +90,15 @@ export async function leadIntake(actor: Actor, leadId: string) {
     .innerJoin(referralPartners, eq(referralPartners.id, referralsOut.partnerId))
     .where(eq(referralsOut.leadId, leadId));
 
+  const [engagement] = await db.select().from(engagements).where(eq(engagements.leadId, leadId));
+  const [matter] = await db
+    .select({ id: matters.id, number: matters.number })
+    .from(matters)
+    .where(eq(matters.leadId, leadId));
+
   return {
+    engagement: engagement ?? null,
+    matter: matter ?? null,
     record: record
       ? {
           practiceArea: area,

@@ -1,7 +1,11 @@
 import { PgBoss } from "pg-boss";
 import { setJobQueue, QUEUES, type JobQueue } from "@/lib/jobs/queue";
+import { DRAFT_KINDS, type DraftKind } from "@/modules/matters/drafts";
 import { log } from "@/lib/log";
 import { runA3 } from "./automations/A3";
+import { processDocument } from "./documents/process";
+import { MATTERS_DAILY_CRON, runDraft, runMattersDaily, runStatusUpdate } from "./matters/drafts";
+import { MATTER_WEEKLY_CRON, runSummary, runWeeklySummaries } from "./matters/summary";
 import { A8_CRON, INTAKE_DAILY_CRON, runA8, runIntakeDaily } from "./automations/followups";
 import { GHL_RECONCILE_CRON, reconcileGhl } from "./ghl/reconcile";
 import { processWebhookJob } from "./ghl/process-webhook";
@@ -14,6 +18,8 @@ import {
 import { SWEEP_CRON, sweep } from "./system/sweep";
 
 type Data = Record<string, unknown>;
+
+const isDraftKind = (k: string): k is DraftKind => k in DRAFT_KINDS;
 
 function stringField(data: unknown, key: string): string {
   const v = (data as Data | null)?.[key];
@@ -53,6 +59,12 @@ export async function startJobs(options: StartOptions): Promise<PgBoss> {
     QUEUES.A3,
     QUEUES.A8,
     QUEUES.intakeDaily,
+    QUEUES.documentProcess,
+    QUEUES.matterSummary,
+    QUEUES.matterStatusUpdate,
+    QUEUES.matterDraft,
+    QUEUES.mattersDaily,
+    QUEUES.mattersWeekly,
   ];
   // Handlers never rely on pg-boss retries: webhooks and sends carry their own retry state.
   for (const q of queues) await boss.createQueue(q, { retryLimit: 0 });
@@ -72,6 +84,39 @@ export async function startJobs(options: StartOptions): Promise<PgBoss> {
   await boss.work(QUEUES.intakeDaily, async () => {
     await runIntakeDaily();
   });
+  await boss.work(QUEUES.documentProcess, polling, async ([job]) => {
+    if (job) await processDocument(stringField(job.data, "documentId"));
+  });
+  await boss.work(QUEUES.matterSummary, polling, async ([job]) => {
+    if (job) {
+      const trigger = stringField(job.data, "trigger");
+      await runSummary(
+        stringField(job.data, "matterId"),
+        trigger === "weekly" || trigger === "document" ? trigger : "on_demand",
+      );
+    }
+  });
+  await boss.work(QUEUES.matterStatusUpdate, polling, async ([job]) => {
+    if (job) {
+      const reason = stringField(job.data, "reason");
+      await runStatusUpdate(
+        stringField(job.data, "matterId"),
+        reason === "no_contact" ? "no_contact" : "stage_change",
+      );
+    }
+  });
+  await boss.work(QUEUES.matterDraft, polling, async ([job]) => {
+    if (!job) return;
+    const kind = stringField(job.data, "kind");
+    if (!isDraftKind(kind)) throw new Error(`unknown draft kind ${kind}`);
+    await runDraft(stringField(job.data, "matterId"), kind, stringField(job.data, "requestedBy"));
+  });
+  await boss.work(QUEUES.mattersDaily, async () => {
+    await runMattersDaily();
+  });
+  await boss.work(QUEUES.mattersWeekly, async () => {
+    await runWeeklySummaries();
+  });
   await boss.work(QUEUES.ghlReconcile, async () => {
     await reconcileGhl();
   });
@@ -89,6 +134,8 @@ export async function startJobs(options: StartOptions): Promise<PgBoss> {
     await boss.schedule(QUEUES.sweep, SWEEP_CRON, null, tz);
     await boss.schedule(QUEUES.A8, A8_CRON, null, tz);
     await boss.schedule(QUEUES.intakeDaily, INTAKE_DAILY_CRON, null, tz);
+    await boss.schedule(QUEUES.mattersDaily, MATTERS_DAILY_CRON, null, tz);
+    await boss.schedule(QUEUES.mattersWeekly, MATTER_WEEKLY_CRON, null, tz);
   }
 
   const queue: JobQueue = {
