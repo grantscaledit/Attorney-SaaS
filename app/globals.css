@@ -1,0 +1,194 @@
+@import "tailwindcss";
+
+/*
+ * LexDesk design tokens. Editorial, dense, quiet: warm paper and ink in light
+ * mode, near-black in dark mode, one oxblood accent. Serif for page titles
+ * only; sans for UI and numbers; mono for small uppercase labels.
+ *
+ * Theme: <html data-theme="light|dark"> forces a mode; without the attribute
+ * the OS preference applies.
+ */
+
+:root {
+  --bg: #f6f5f1;
+  --surface: #ffffff;
+  --surface-2: #f0eee8;
+  --surface-sunken: #ebe8e0;
+  --border: #e1ddd3;
+  --border-strong: #cbc6b9;
+  --ink: #17160f;
+  --ink-2: #47443c;
+  --muted: #736f65;
+  --accent: #7a1f2b;
+  --accent-hover: #63171f;
+  --accent-ink: #ffffff;
+  --accent-soft: #f4e7e8;
+  --focus: #7a1f2b;
+  --good: #1f6f2a;
+  --good-soft: #e5f1e5;
+  --warning: #8a5a00;
+  --warning-soft: #f8eed9;
+  --critical: #a8231b;
+  --critical-soft: #f8e4e2;
+  --info: #284f7a;
+  --info-soft: #e4ecf5;
+  --shadow: 0 1px 2px rgb(23 22 15 / 0.06), 0 1px 1px rgb(23 22 15 / 0.03);
+  --overlay: rgb(23 22 15 / 0.45);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c0c0d;
+    --surface: #131315;
+    --surface-2: #19191c;
+    --surface-sunken: #0f0f11;
+    --border: #26262a;
+    --border-strong: #3a3a40;
+    --ink: #eceae4;
+    --ink-2: #b9b6ad;
+    --muted: #8a877e;
+    --accent: #d77b86;
+    --accent-hover: #e3949d;
+    --accent-ink: #1a0a0d;
+    --accent-soft: #2a1619;
+    --focus: #d77b86;
+    --good: #5cc26c;
+    --good-soft: #13261a;
+    --warning: #e0a63a;
+    --warning-soft: #2b2110;
+    --critical: #f0736a;
+    --critical-soft: #2e1513;
+    --info: #7fa8d6;
+    --info-soft: #142030;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+    --overlay: rgb(0 0 0 / 0.6);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0c0c0d;
+  --surface: #131315;
+  --surface-2: #19191c;
+  --surface-sunken: #0f0f11;
+  --border: #26262a;
+  --border-strong: #3a3a40;
+  --ink: #eceae4;
+  --ink-2: #b9b6ad;
+  --muted: #8a877e;
+  --accent: #d77b86;
+  --accent-hover: #e3949d;
+  --accent-ink: #1a0a0d;
+  --accent-soft: #2a1619;
+  --focus: #d77b86;
+  --good: #5cc26c;
+  --good-soft: #13261a;
+  --warning: #e0a63a;
+  --warning-soft: #2b2110;
+  --critical: #f0736a;
+  --critical-soft: #2e1513;
+  --info: #7fa8d6;
+  --info-soft: #142030;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+  --overlay: rgb(0 0 0 / 0.6);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-sunken: var(--surface-sunken);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-focus: var(--focus);
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-critical: var(--critical);
+  --color-critical-soft: var(--critical-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-overlay: var(--overlay);
+  --shadow-panel: var(--shadow);
+
+  --font-serif: "Source Serif 4 Variable", "Source Serif 4", Georgia, serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 8px;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--accent-soft);
+  }
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  /* Small uppercase label: section eyebrows, table headers, field labels. */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .page-title {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    font-size: 26px;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@layer components {
+  .select-chevron {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23857f73' stroke-width='1.5'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 14px;
+  }
+}

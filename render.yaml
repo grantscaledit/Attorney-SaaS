@@ -1,0 +1,87 @@
+# LexDesk: Render Blueprint for ONE firm deployment (spec Section 2).
+#
+# Every firm gets its own web service, worker, Postgres database and env group.
+# This file is the template. `pnpm provision-firm` renders a per-firm copy
+# (service names prefixed with the firm slug) into .provision/<slug>/render.yaml
+# and generates that firm's secrets into .provision/<slug>/env.
+#
+# VERIFY before first production use: plan names, region, preDeployCommand
+# support on the chosen plan, and postgresMajorVersion against Render's current
+# Blueprint spec (https://render.com/docs/blueprint-spec). This file was written
+# without access to Render's live docs.
+
+databases:
+  - name: lexdesk-db
+    plan: basic-1gb
+    region: ohio
+    databaseName: lexdesk
+    user: lexdesk
+    postgresMajorVersion: "16"
+    # No access from outside Render's private network.
+    ipAllowList: []
+
+services:
+  - type: web
+    name: lexdesk-web
+    runtime: node
+    plan: standard
+    region: ohio
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
+    # Rule 11: migrations run before the new version takes traffic.
+    preDeployCommand: pnpm db:migrate
+    startCommand: pnpm start
+    healthCheckPath: /api/health
+    autoDeploy: false
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: lexdesk-db
+          property: connectionString
+      - fromGroup: lexdesk-config
+
+  - type: worker
+    name: lexdesk-worker
+    runtime: node
+    plan: starter
+    region: ohio
+    buildCommand: corepack enable && pnpm install --frozen-lockfile
+    startCommand: pnpm worker
+    autoDeploy: false
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: lexdesk-db
+          property: connectionString
+      - fromGroup: lexdesk-config
+
+envVarGroups:
+  - name: lexdesk-config
+    envVars:
+      # Firm identity: set from .provision/<slug>/env
+      - key: FIRM_SLUG
+        sync: false
+      - key: FIRM_TIER
+        sync: false
+      - key: FIRM_TIMEZONE
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: DEMO_MODE
+        value: "false"
+      # Secrets: generated per firm by provision-firm, never committed
+      - key: AUTH_SECRET
+        sync: false
+      - key: FIELD_ENCRYPTION_KEY
+        sync: false
+      - key: GHL_WEBHOOK_SECRET
+        sync: false
+      - key: LOG_LEVEL
+        value: info
