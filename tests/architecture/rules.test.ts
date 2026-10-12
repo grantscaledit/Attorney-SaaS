@@ -62,15 +62,28 @@ describe("authorization: every entry point checks the session", () => {
     expect(unguarded).toEqual([]);
   });
 
-  it("every API route except auth and health checks the session", () => {
+  it("every API route except auth, health and webhooks checks the session", () => {
     const PUBLIC = new Set(["app/api/auth/[...all]/route.ts", "app/api/health/route.ts"]);
     const routes = source.filter(
-      (f) => /^app\/api\/.*route\.ts$/.test(rel(f)) && !PUBLIC.has(rel(f)),
+      (f) =>
+        /^app\/api\/.*route\.ts$/.test(rel(f)) &&
+        !PUBLIC.has(rel(f)) &&
+        !rel(f).startsWith("app/api/webhooks/"),
     );
     const unguarded = routes
       .filter((f) => !/\brequire(Session|User|Permission)\(/.test(read(f)))
       .map(rel);
     expect(unguarded).toEqual([]);
+  });
+
+  it("every webhook route authenticates the sender before doing anything", () => {
+    const routes = source.filter((f) => /^app\/api\/webhooks\/.*route\.ts$/.test(rel(f)));
+    expect(routes.length).toBeGreaterThan(0);
+    const unguarded = routes.filter((f) => !/\bhandleGhlWebhook\(/.test(read(f))).map(rel);
+    expect(unguarded).toEqual([]);
+    // The handler itself must verify credentials.
+    const handler = read(path.join(ROOT, "modules/ghl/ingest.ts"));
+    expect(handler).toMatch(/\bauthenticateWebhook\(/);
   });
 
   it("every server action in the signed-in app goes through runCommand or requireSession", () => {
@@ -112,5 +125,23 @@ describe("rule 6: logs never carry message bodies", () => {
   it("console.log is not used in app code (structured logger only)", () => {
     const offenders = source.filter((f) => /console\.log\(/.test(read(f))).map(rel);
     expect(offenders).toEqual([]);
+  });
+});
+
+describe("rule 4: automatic messages only leave through the outbox", () => {
+  it("only the send job calls GHL's sendMessage", () => {
+    const callers = source
+      .filter((f) => !/\.test\.tsx?$/.test(f))
+      .filter((f) => /\.sendMessage\(/.test(read(f)))
+      .map(rel);
+    expect(callers).toEqual(["jobs/messaging/send.ts"]);
+  });
+
+  it("only lib/ghl/client.ts talks to the GHL API host", () => {
+    const offenders = source
+      .filter((f) => !/\.test\.tsx?$/.test(f))
+      .filter((f) => /leadconnectorhq\.com/.test(read(f)))
+      .map(rel);
+    expect(offenders).toEqual(["lib/ghl/endpoints.ts"]);
   });
 });

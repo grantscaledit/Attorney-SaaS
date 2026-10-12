@@ -13,6 +13,7 @@ export default defineConfig({
             "lib/**/*.test.ts",
             "modules/**/*.test.ts",
             "practice/**/*.test.ts",
+            "ghl/**/*.test.ts",
             "tests/architecture/**/*.test.ts",
           ],
           environment: "node",

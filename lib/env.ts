@@ -43,7 +43,12 @@ export const envSchema = z
       .refine((v) => Buffer.from(v, "base64").length === 32, "must be 32 bytes, base64 encoded"),
     GHL_PRIVATE_TOKEN: optionalString,
     GHL_LOCATION_ID: optionalString,
-    GHL_WEBHOOK_SECRET: optionalString,
+    GHL_WEBHOOK_SECRET: optionalString.refine(
+      (v) => v === undefined || v.length >= 32,
+      "GHL_WEBHOOK_SECRET must be at least 32 characters",
+    ),
+    /** Override for GHL's published webhook signing key (PEM), for key rotation. */
+    GHL_WEBHOOK_PUBLIC_KEY: optionalString,
     ANTHROPIC_API_KEY: optionalString,
     ALLOW_RAW_DOCUMENT_TO_LLM: booleanFromString,
     SENTRY_DSN: optionalString,
@@ -56,6 +61,13 @@ export const envSchema = z
         code: "custom",
         path: ["DEMO_MODE"],
         message: "DEMO_MODE=true cannot be combined with GHL credentials",
+      });
+    }
+    if (env.GHL_PRIVATE_TOKEN && !env.GHL_LOCATION_ID) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["GHL_LOCATION_ID"],
+        message: "GHL_LOCATION_ID is required when GHL_PRIVATE_TOKEN is set",
       });
     }
     const local = ["localhost", "127.0.0.1"].includes(new URL(env.APP_URL).hostname);

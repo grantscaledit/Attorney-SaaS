@@ -1,6 +1,23 @@
 import { recordAuditExport } from "@/modules/audit/commands/record-export";
 import { verifyChain } from "@/modules/audit/commands/verify-chain";
 import { bootstrapFirm } from "@/modules/firm/commands/bootstrap";
+import { ingestGhlWebhook } from "@/modules/ghl/commands/ingest-webhook";
+import {
+  markGhlWebhookFailed,
+  processGhlWebhook,
+  retryGhlWebhook,
+} from "@/modules/ghl/commands/process-webhook";
+import {
+  reconcileGhlBatch,
+  recordSyncRun,
+  requestReconcile,
+} from "@/modules/ghl/commands/reconcile";
+import { claimMessage, markStaleSend, recordSendResult } from "@/modules/messaging/commands/outbox";
+import {
+  approveMessageTemplate,
+  saveMessageTemplate,
+  withdrawTemplateApproval,
+} from "@/modules/messaging/commands/templates";
 import { setFeatureEnabled } from "@/modules/firm/commands/set-feature";
 import { updateFirmSettings } from "@/modules/firm/commands/update-settings";
 import { acceptInvite } from "@/modules/users/commands/accept-invite";
@@ -32,4 +49,18 @@ export const COMMANDS = [
   acceptInvite,
   verifyChain,
   recordAuditExport,
+  // Phase 1: GHL sync and intake
+  ingestGhlWebhook,
+  processGhlWebhook,
+  markGhlWebhookFailed,
+  retryGhlWebhook,
+  reconcileGhlBatch,
+  recordSyncRun,
+  requestReconcile,
+  claimMessage,
+  recordSendResult,
+  markStaleSend,
+  saveMessageTemplate,
+  approveMessageTemplate,
+  withdrawTemplateApproval,
 ] as const satisfies readonly AnyCommand[];

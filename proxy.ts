@@ -14,6 +14,8 @@ const PUBLIC_PREFIXES = [
   "/sign-out",
   "/api/auth/",
   "/api/health",
+  // Authenticated by shared secret or signature in modules/ghl/ingest.ts, not by session.
+  "/api/webhooks/",
   "/setup/mfa",
 ];
 

@@ -57,6 +57,22 @@ export function formatCount(n: number): string {
   return new Intl.NumberFormat("en-US").format(n);
 }
 
+/** "45 sec", "6 min", "3.5 hr", "2.1 days". */
+export function formatDuration(seconds: number | null): string {
+  if (seconds === null || !Number.isFinite(seconds)) return "–";
+  const s = Math.max(0, seconds);
+  if (s < 90) return `${Math.round(s)} sec`;
+  if (s < 90 * 60) return `${Math.round(s / 60)} min`;
+  if (s < 36 * 3600) return `${(s / 3600).toFixed(1).replace(/\.0$/, "")} hr`;
+  return `${(s / 86400).toFixed(1).replace(/\.0$/, "")} days`;
+}
+
+/** 0.4567 -> "46%". */
+export function formatPercent(rate: number | null): string {
+  if (rate === null || !Number.isFinite(rate)) return "–";
+  return `${Math.round(rate * 100)}%`;
+}
+
 /** "users.role_changed" -> "Role changed"; known actions get hand-written labels. */
 const ACTION_LABELS: Record<string, string> = {
   "auth.signed_in": "Signed in",
@@ -89,6 +105,35 @@ const ACTION_LABELS: Record<string, string> = {
   "users.setup_link_issued": "Setup link issued",
   "users.mfa_reset": "MFA reset",
   "users.sessions_revoked": "Sessions ended by owner",
+  "ghl.webhook_received": "GoHighLevel event received",
+  "ghl.webhook_duplicate": "Duplicate GoHighLevel event ignored",
+  "ghl.webhook_processed": "GoHighLevel event applied",
+  "ghl.webhook_ignored": "GoHighLevel event not used",
+  "ghl.webhook_failed": "GoHighLevel event failed",
+  "ghl.webhook_retry_requested": "GoHighLevel event retry requested",
+  "ghl.reconcile_batch": "GoHighLevel reconciliation batch",
+  "ghl.reconcile_requested": "GoHighLevel reconciliation requested",
+  "ghl.sync_started": "GoHighLevel reconciliation started",
+  "ghl.sync_succeeded": "GoHighLevel reconciliation finished",
+  "ghl.sync_failed": "GoHighLevel reconciliation failed",
+  "intake.lead_created": "Lead opened",
+  "intake.lead_responded": "Lead first response",
+  "intake.lead_retained": "Lead retained",
+  "intake.lead_lost": "Lead lost",
+  "intake.consent_granted": "SMS consent recorded",
+  "intake.consent_revoked": "Messaging consent revoked",
+  "automations.A1_ran": "A1 missed-call text-back",
+  "automations.A2_ran": "A2 instant lead response",
+  "automations.A7_ran": "A7 consult messages planned",
+  "messaging.queued": "Message queued",
+  "messaging.suppressed": "Message not sent (rule)",
+  "messaging.suppressed_at_send": "Message stopped before sending",
+  "messaging.sent": "Message sent",
+  "messaging.simulated": "Message simulated (demo)",
+  "messaging.send_outcome_unknown": "Message outcome unknown",
+  "messaging.template_saved": "Message template edited",
+  "messaging.template_approved": "Message template approved",
+  "messaging.template_approval_withdrawn": "Template approval withdrawn",
 };
 
 export function actionLabel(action: string): string {

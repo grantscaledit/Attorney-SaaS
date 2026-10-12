@@ -22,7 +22,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const { user, policy } = session;
   const [firm, counters, theme] = await Promise.all([
     loadFirmSettings(),
-    loadOpsCounters(),
+    loadOpsCounters(user),
     cookies().then((c) => parseTheme(c.get(THEME_COOKIE)?.value)),
   ]);
 

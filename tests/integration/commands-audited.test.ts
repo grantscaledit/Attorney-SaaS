@@ -1,12 +1,23 @@
-import { desc, eq, gt } from "drizzle-orm";
+import { desc, eq, gt, sql } from "drizzle-orm";
 import { beforeAll, describe, expect, it } from "vitest";
-import { auditLog, firmSettings, sessions, users } from "@/db/schema";
+import { auditLog, firmSettings, messages, sessions, users } from "@/db/schema";
 import type { AnyCommand, Principal, SessionUser } from "@/lib/commands/define";
 import { CommandError } from "@/lib/commands/errors";
 import { COMMANDS } from "@/lib/commands/registry";
 import { inviteUser } from "@/modules/users/commands/invite";
 import { updateFirmSettings } from "@/modules/firm/commands/update-settings";
 import { DEFAULT_AI_DISCLOSURE } from "@/modules/firm/schemas";
+import { ingestGhlWebhook } from "@/modules/ghl/commands/ingest-webhook";
+import { markGhlWebhookFailed, processGhlWebhook } from "@/modules/ghl/commands/process-webhook";
+import { claimMessage } from "@/modules/messaging/commands/outbox";
+import { setFeatureEnabled } from "@/modules/firm/commands/set-feature";
+import {
+  configureGhlEnv,
+  daytimeZone,
+  ghlContactPayload,
+  missedCallPayload,
+  prepareMessaging,
+} from "./ghl-kit";
 import {
   SYSTEM,
   asUser,
@@ -26,6 +37,7 @@ import {
 
 // Firm tier so the fixtures are not limited by the Solo seat cap (tested in users.test.ts).
 process.env.FIRM_TIER = "firm";
+configureGhlEnv();
 const { db } = withFreshDatabase();
 
 let owner: SessionUser;
@@ -38,6 +50,42 @@ type Fixture = {
   /** Runs on a database without a firm. */
   needsEmptyDatabase?: boolean;
 };
+
+/** Stores a webhook (as the route does) and returns its id. */
+async function ingest(dedupeKey: string, payload: Record<string, unknown>): Promise<string> {
+  const r = (await run(ingestGhlWebhook, SYSTEM, {
+    dedupeKey,
+    eventType: String(payload.type),
+    authMethod: "shared_secret",
+    locationId: null,
+    payload,
+  })) as { eventId: string };
+  return r.eventId;
+}
+
+/** A queued A1 text-back for a fresh missed call. */
+async function queuedTextBack(ref: string): Promise<string> {
+  await prepareMessaging(owner);
+  // The flags.set fixture switched A1 off.
+  await run(setFeatureEnabled, asUser(owner), { flag: "automation.A1", enabled: true }).catch(
+    (e: unknown) => {
+      if (!(e instanceof CommandError && e.code === "invalid_state")) throw e;
+    },
+  );
+  const contactId = `fixture_${ref}`;
+  const eventId = await ingest(`fixture:call:${ref}`, missedCallPayload(contactId, `call_${ref}`));
+  const contact = ghlContactPayload(contactId, { timezone: daytimeZone() });
+  await run(processGhlWebhook, SYSTEM, { eventId, enrichment: { contact } });
+  const [m] = await db()
+    .select({ id: messages.id })
+    .from(messages)
+    .where(sql`${messages.context}->>'callId' is not null and ${messages.status} = 'queued'`)
+    .orderBy(desc(messages.createdAt))
+    .limit(1);
+  return m!.id;
+}
+
+let claimedMessageId = "";
 
 async function makeStaff(email: string): Promise<string> {
   const r = (await run(inviteUser, asUser(owner), {
@@ -139,6 +187,121 @@ const FIXTURES: Record<string, Fixture> = {
     principal: () => asUser(owner),
     input: () => ({ filters: { actor: "user" }, format: "csv" }),
     expectAction: "audit.exported",
+  },
+  "ghl.ingest_webhook": {
+    principal: () => SYSTEM,
+    input: () => ({
+      dedupeKey: "fixture:ingest",
+      eventType: "ContactCreate",
+      authMethod: "shared_secret",
+      locationId: null,
+      payload: { ...ghlContactPayload("fixture_ingest"), type: "ContactCreate" },
+    }),
+    expectAction: "ghl.webhook_received",
+  },
+  "ghl.process_webhook": {
+    principal: () => SYSTEM,
+    input: async () => ({
+      eventId: await ingest("fixture:process", {
+        ...ghlContactPayload("fixture_process"),
+        type: "ContactCreate",
+      }),
+    }),
+    expectAction: "ghl.webhook_processed",
+  },
+  "ghl.mark_webhook_failed": {
+    principal: () => SYSTEM,
+    input: async () => ({
+      eventId: await ingest("fixture:failed", {
+        ...ghlContactPayload("fixture_failed"),
+        type: "ContactCreate",
+      }),
+      error: "simulated failure",
+    }),
+    expectAction: "ghl.webhook_failed",
+  },
+  "ghl.retry_webhook": {
+    principal: () => asUser(owner),
+    input: async () => {
+      const eventId = await ingest("fixture:retry", {
+        ...ghlContactPayload("fixture_retry"),
+        type: "ContactCreate",
+      });
+      await run(markGhlWebhookFailed, SYSTEM, { eventId, error: "simulated failure" });
+      return { eventId };
+    },
+    expectAction: "ghl.webhook_retry_requested",
+  },
+  "ghl.reconcile_batch": {
+    principal: () => SYSTEM,
+    input: () => ({
+      kind: "contacts",
+      runId: "fixture-run",
+      items: [ghlContactPayload("fixture_reconcile")],
+    }),
+    expectAction: "ghl.reconcile_batch",
+  },
+  "ghl.record_sync_run": {
+    principal: () => SYSTEM,
+    input: () => ({ key: "ghl.reconcile", runId: "fixture-run", phase: "started" }),
+    expectAction: "ghl.sync_started",
+  },
+  "ghl.request_reconcile": {
+    principal: () => asUser(owner),
+    input: () => ({}),
+    expectAction: "ghl.reconcile_requested",
+  },
+  "messaging.claim": {
+    principal: () => SYSTEM,
+    input: async () => {
+      claimedMessageId = await queuedTextBack("claim");
+      return { messageId: claimedMessageId };
+    },
+    expectAction: "messaging.send_started",
+  },
+  "messaging.record_result": {
+    principal: () => SYSTEM,
+    input: () => ({
+      messageId: claimedMessageId,
+      outcome: "sent",
+      ghlMessageId: "fixture_ghl_msg",
+    }),
+    expectAction: "messaging.sent",
+  },
+  "messaging.mark_stale_send": {
+    principal: () => SYSTEM,
+    input: async () => {
+      const messageId = await queuedTextBack("stale");
+      await run(claimMessage, SYSTEM, { messageId });
+      await db()
+        .update(messages)
+        .set({ updatedAt: new Date(Date.now() - 60 * 60_000) })
+        .where(eq(messages.id, messageId));
+      return { messageId };
+    },
+    expectAction: "messaging.send_outcome_unknown",
+  },
+  "messaging.template_save": {
+    principal: () => asUser(owner),
+    input: () => ({
+      key: "A2.sms",
+      body: "Thank you for contacting {{firmName}}. Book at {{bookingUrl}}. Reply STOP to opt out.",
+    }),
+    expectAction: "messaging.template_saved",
+  },
+  "messaging.template_approve": {
+    principal: () => asUser(owner),
+    input: () => ({
+      key: "A2.sms",
+      body: "Thank you for contacting {{firmName}}. Book at {{bookingUrl}}. Reply STOP to opt out.",
+      subject: null,
+    }),
+    expectAction: "messaging.template_approved",
+  },
+  "messaging.template_withdraw": {
+    principal: () => asUser(owner),
+    input: () => ({ key: "A2.sms" }),
+    expectAction: "messaging.template_approval_withdrawn",
   },
 };
 

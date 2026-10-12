@@ -9,7 +9,16 @@ import type { FeatureFlag } from "@/lib/flags/catalog";
 export type NavItem = {
   href: Route;
   label: string;
-  icon: "overview" | "audit" | "firm" | "users" | "features" | "security";
+  icon:
+    | "overview"
+    | "intake"
+    | "audit"
+    | "firm"
+    | "users"
+    | "features"
+    | "integrations"
+    | "templates"
+    | "security";
   permission: Action;
   flag?: FeatureFlag;
   /** Match nested routes as active. */
@@ -21,7 +30,10 @@ export type NavSection = { label: string; items: NavItem[] };
 export const NAV: NavSection[] = [
   {
     label: "Workspace",
-    items: [{ href: "/", label: "Overview", icon: "overview", permission: "dashboard.view" }],
+    items: [
+      { href: "/", label: "Overview", icon: "overview", permission: "dashboard.view" },
+      { href: "/intake", label: "Intake", icon: "intake", permission: "leads.read", prefix: true },
+    ],
   },
   {
     label: "Administration",
@@ -40,6 +52,18 @@ export const NAV: NavSection[] = [
         permission: "users.read",
       },
       { href: "/settings/features", label: "Features", icon: "features", permission: "flags.read" },
+      {
+        href: "/settings/integrations",
+        label: "GoHighLevel",
+        icon: "integrations",
+        permission: "firm.settings.update",
+      },
+      {
+        href: "/settings/templates",
+        label: "Message templates",
+        icon: "templates",
+        permission: "firm.settings.read",
+      },
     ],
   },
   {
