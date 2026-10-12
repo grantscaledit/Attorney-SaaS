@@ -96,3 +96,9 @@ pnpm provision-firm --help
   with `scopeOf(matter)`. Files go through `lib/storage` (never the filesystem directly) under
   keys without client data; text goes through `lib/ocr`, then `maskText`, before anything else
   sees it. Portal pages call `requireClient()`; staff pages never serve clients.
+- Deadlines (ADR 0009): trigger events and seed rules live in `practice/<area>/deadlines.ts`.
+  Compute dates only through `computeDue()` in `modules/deadlines/engine.ts`, which refuses any
+  rule whose verification hash does not match; never write a rule-origin deadline any other way
+  (a database trigger also refuses). Date math uses `modules/deadlines/date-math.ts` on date-only
+  strings. Show `DEADLINE_NOTICE` wherever a deadline appears. Never mark a seed rule verified in
+  code, migrations or seeds outside the demo.

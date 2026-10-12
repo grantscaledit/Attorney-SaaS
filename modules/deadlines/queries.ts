@@ -173,7 +173,8 @@ export async function matterDeadlines(actor: Actor, m: MatterRow) {
       noticeType: ev.noticeType,
       flags: ev.flags,
     })) {
-      if (verificationOf(r) !== "verified")
+      const state = verificationOf(r);
+      if (state === "unverified" || state === "changed_since_verified")
         waiting.set(r.id, {
           rule: r.label,
           event: eventDefs.find((e) => e.key === ev.kind)?.label ?? ev.kind,

@@ -35,6 +35,7 @@ import {
 } from "@/modules/deadlines/commands/deadlines";
 import {
   addHoliday,
+  setRuleActive,
   syncDeadlineRules,
   updateDeadlineRule,
   verifyDeadlineRule,
@@ -738,5 +739,26 @@ describe("permissions", () => {
         note: "x y z",
       }),
     ).rejects.toThrow(/cannot be cancelled by hand/);
+  });
+});
+
+describe("switched-off rules", () => {
+  it("compute nothing and raise no verification task", async () => {
+    const r = await rule("estate.tx_beneficiary_notice");
+    await run(setRuleActive, asUser(owner), { ruleId: r.id, active: false });
+    const m = await openTestMatter(owner, { practiceArea: "estate", matterType: "probate" });
+    const out = (await run(recordEvent, asUser(owner), {
+      matterId: m.matterId,
+      kind: "will_admitted",
+      occurredOn: "2026-02-02",
+    })) as { computed: number; unverified: number };
+    expect(out).toMatchObject({ computed: 0, unverified: 0 });
+    const verifyTasks = await db()
+      .select()
+      .from(tasks)
+      .where(and(eq(tasks.matterId, m.matterId), eq(tasks.automationId, "C1")));
+    expect(verifyTasks).toHaveLength(0);
+    const view = await matterDeadlines(owner, (await matterRow(m.matterId))!);
+    expect(view!.waiting).toEqual([]);
   });
 });

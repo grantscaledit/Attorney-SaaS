@@ -56,6 +56,9 @@ describe("provision-firm", () => {
     const firm = await c.query("SELECT slug, legal_name, practice_areas FROM firm_settings");
     const owner = await c.query("SELECT email, role, two_factor_enabled FROM users");
     const audit = await c.query("SELECT action, actor_type FROM audit_log ORDER BY seq");
+    const rules = await c.query(
+      "SELECT count(*)::int AS n, count(verified_at)::int AS verified FROM deadline_rules",
+    );
     await c.end();
 
     expect(firm.rows).toEqual([
@@ -67,7 +70,10 @@ describe("provision-firm", () => {
     expect(audit.rows.map((r: { action: string }) => r.action)).toEqual([
       "firm.provisioned",
       "users.invited",
+      "deadlines.rules_synced",
     ]);
+    // The product's deadline rule seeds arrive, none of them verified (spec Section 8).
+    expect(rules.rows[0]).toEqual({ n: 14, verified: 0 });
     expect(audit.rows.every((r: { actor_type: string }) => r.actor_type === "system")).toBe(true);
   });
 

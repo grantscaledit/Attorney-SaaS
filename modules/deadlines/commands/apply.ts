@@ -144,7 +144,8 @@ export async function applyEvent(
     if (rule.preferPrinted && printed) {
       const r = computeDue(rule, { triggerOn: ev.occurredOn, holidays: c.holidays });
       if (!r.ok) {
-        out.unverified.push(rule.id);
+        // A rule the firm switched off is a decision, not a gap: no verification task.
+        if (r.reason !== "inactive") out.unverified.push(rule.id);
         continue;
       }
       const crossCheck = {
@@ -239,7 +240,7 @@ export async function computeOccurrence(
     occurrence,
   });
   if (!r.ok) {
-    out.unverified.push(rule.id);
+    if (r.reason !== "inactive") out.unverified.push(rule.id);
     // The date stays as computed under the earlier verification, flagged for review.
     if (prev && prev.status === "open" && !prev.ruleChanged) {
       await tx
