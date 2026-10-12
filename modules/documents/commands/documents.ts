@@ -13,6 +13,7 @@ import { defineCommand } from "@/lib/commands/define";
 import { CommandError } from "@/lib/commands/errors";
 import { requireSystem } from "@/lib/commands/system";
 import { maskText } from "@/lib/masking";
+import { syncNoticeDeadline } from "@/modules/deadlines/commands/notice";
 import { automationEnabled, recordAutomationRun } from "@/modules/messaging/commands/outbox";
 import { DOC_TYPE_LABELS, DOC_TYPES } from "@/practice";
 import { firmToday, lockMatter, scopeOf } from "@/modules/matters/scope";
@@ -412,7 +413,7 @@ export const applyProcessing = defineCommand({
         })
         .onConflictDoNothing();
       if (f.respondBy) {
-        // Phase 4's deadline engine (C1) takes this over; until then it is a task dated from the document.
+        // The work item. The date itself is tracked as a deadline (below, C1) with alerts (C2).
         await tx
           .insert(tasks)
           .values({
@@ -427,6 +428,9 @@ export const applyProcessing = defineCommand({
           })
           .onConflictDoNothing();
       }
+      audit.push(
+        ...(await syncNoticeDeadline(tx, m, doc.id, f, { confirmed: false, actorId: null })),
+      );
       await tx
         .update(matters)
         .set({
@@ -513,6 +517,10 @@ export const confirmExtraction = defineCommand({
         .set({ dueOn: input.fields.respondBy, updatedAt: now })
         .where(and(eq(tasks.dedupeKey, `B3:respond:${doc!.id}`), eq(tasks.status, "open")));
     }
+    const deadlineAudit = await syncNoticeDeadline(ctx.tx, m, doc!.id, input.fields, {
+      confirmed: true,
+      actorId: actorId(ctx.principal),
+    });
     await ctx.tx
       .update(tasks)
       .set({
@@ -532,6 +540,7 @@ export const confirmExtraction = defineCommand({
           before: changed ? before : undefined,
           after: changed ? input.fields : { status: "confirmed" },
         },
+        ...deadlineAudit,
       ],
     };
   },

@@ -3,6 +3,14 @@ import { setJobQueue, QUEUES, type JobQueue } from "@/lib/jobs/queue";
 import { DRAFT_KINDS, type DraftKind } from "@/modules/matters/drafts";
 import { log } from "@/lib/log";
 import { runA3 } from "./automations/A3";
+import {
+  DEADLINES_DAILY_CRON,
+  DEADLINES_ESCALATE_CRON,
+  DEADLINES_WEEKLY_CRON,
+  escalateDeadlinesJob,
+  runDeadlineAuditJob,
+  runDeadlinesDailyJob,
+} from "./deadlines/run";
 import { processDocument } from "./documents/process";
 import { MATTERS_DAILY_CRON, runDraft, runMattersDaily, runStatusUpdate } from "./matters/drafts";
 import { MATTER_WEEKLY_CRON, runSummary, runWeeklySummaries } from "./matters/summary";
@@ -65,6 +73,9 @@ export async function startJobs(options: StartOptions): Promise<PgBoss> {
     QUEUES.matterDraft,
     QUEUES.mattersDaily,
     QUEUES.mattersWeekly,
+    QUEUES.deadlinesDaily,
+    QUEUES.deadlinesEscalate,
+    QUEUES.deadlinesWeekly,
   ];
   // Handlers never rely on pg-boss retries: webhooks and sends carry their own retry state.
   for (const q of queues) await boss.createQueue(q, { retryLimit: 0 });
@@ -117,6 +128,15 @@ export async function startJobs(options: StartOptions): Promise<PgBoss> {
   await boss.work(QUEUES.mattersWeekly, async () => {
     await runWeeklySummaries();
   });
+  await boss.work(QUEUES.deadlinesDaily, async () => {
+    await runDeadlinesDailyJob();
+  });
+  await boss.work(QUEUES.deadlinesEscalate, async () => {
+    await escalateDeadlinesJob();
+  });
+  await boss.work(QUEUES.deadlinesWeekly, async () => {
+    await runDeadlineAuditJob();
+  });
   await boss.work(QUEUES.ghlReconcile, async () => {
     await reconcileGhl();
   });
@@ -136,6 +156,9 @@ export async function startJobs(options: StartOptions): Promise<PgBoss> {
     await boss.schedule(QUEUES.intakeDaily, INTAKE_DAILY_CRON, null, tz);
     await boss.schedule(QUEUES.mattersDaily, MATTERS_DAILY_CRON, null, tz);
     await boss.schedule(QUEUES.mattersWeekly, MATTER_WEEKLY_CRON, null, tz);
+    await boss.schedule(QUEUES.deadlinesDaily, DEADLINES_DAILY_CRON, null, tz);
+    await boss.schedule(QUEUES.deadlinesEscalate, DEADLINES_ESCALATE_CRON, null, tz);
+    await boss.schedule(QUEUES.deadlinesWeekly, DEADLINES_WEEKLY_CRON, null, tz);
   }
 
   const queue: JobQueue = {

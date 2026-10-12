@@ -23,6 +23,8 @@ export const TEMPLATE_VARIABLES = {
   signingUrl: "The engagement letter's e-signature link (A9)",
   outstandingItems: "Documents still needed from the client, one per line (B2)",
   portalUrl: "The client portal sign-in page",
+  dueIn: 'How far away a deadline is, such as "due in 3 days" (staff alerts only)',
+  deadlineUrl: "Link to the deadline's matter in LexDesk (staff alerts only)",
 } as const;
 
 export type TemplateVariable = keyof typeof TEMPLATE_VARIABLES;
@@ -30,7 +32,7 @@ export type TemplateValues = Partial<Record<TemplateVariable, string | null>>;
 
 export type TemplateDefinition = {
   key: string;
-  automationId: "A1" | "A2" | "A3" | "A5" | "A7" | "A9" | "A10" | "B2";
+  automationId: "A1" | "A2" | "A3" | "A5" | "A7" | "A9" | "A10" | "B2" | "C2";
   channel: Extract<MessageChannel, "sms" | "email">;
   label: string;
   /** When it sends, in plain words, for the approval screen. */
@@ -222,6 +224,22 @@ export const DEFAULT_TEMPLATES = [
     label: "Document reminder (text)",
     when: "With the email reminder, when the client has a mobile number and has agreed to texts.",
     body: `{{firmName}}: we still need some documents for your matter. Please upload them in the client portal: {{portalUrl}} ${STOP}`,
+  },
+  {
+    key: "C2.alert.sms",
+    automationId: "C2",
+    channel: "sms",
+    label: "Deadline alert to the attorney",
+    when: "To the deadline owner's own phone (their GHL contact) 3 days and 1 day before a deadline, and on the day. Contains no client details.",
+    body: "LexDesk: a deadline is {{dueIn}}. Open it and acknowledge: {{deadlineUrl}}",
+  },
+  {
+    key: "C2.escalation.sms",
+    automationId: "C2",
+    channel: "sms",
+    label: "Unacknowledged deadline alert, to the owner attorney",
+    when: "To each owner attorney's own phone when a critical deadline alert has not been acknowledged within 4 hours. Contains no client details.",
+    body: "LexDesk: a critical deadline alert ({{dueIn}}) has not been acknowledged. Open it: {{deadlineUrl}}",
   },
 ] as const satisfies readonly TemplateDefinition[];
 

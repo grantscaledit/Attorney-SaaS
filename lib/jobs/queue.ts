@@ -28,6 +28,12 @@ export const QUEUES = {
   mattersDaily: "matters.daily",
   /** B7 weekly summaries. */
   mattersWeekly: "matters.weekly",
+  /** C3 annual deadlines, C5 payment dates, C2 alerts: once a day. */
+  deadlinesDaily: "deadlines.daily",
+  /** C2 escalation of unacknowledged critical alerts: hourly. */
+  deadlinesEscalate: "deadlines.escalate",
+  /** C7 deadline audit: weekly. */
+  deadlinesWeekly: "deadlines.weekly",
   /** A10 nurture enrolment and A11 cold-lead letters. */
   intakeDaily: "automation.intake_daily",
 } as const;

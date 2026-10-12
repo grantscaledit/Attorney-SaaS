@@ -21,6 +21,22 @@ import { decideApproval } from "@/modules/approvals/commands/decide";
 import { applyProcessing, recordUpload } from "@/modules/documents/commands/documents";
 import { draftEngagement } from "@/modules/matters/commands/engagements";
 import { addParty, createTask } from "@/modules/matters/commands/matters";
+import { deadlineRules, deadlines } from "@/db/schema";
+import { runDeadlinesDaily } from "@/modules/deadlines/commands/automations";
+import { createCalendarFeed } from "@/modules/deadlines/commands/calendar";
+import {
+  addDeadline,
+  addTolling,
+  recordEvent,
+  setPaymentPlan,
+} from "@/modules/deadlines/commands/deadlines";
+import {
+  addHoliday,
+  syncDeadlineRules,
+  verifyDeadlineRule,
+} from "@/modules/deadlines/commands/rules";
+import { hashOfRow } from "@/modules/deadlines/rules";
+import { firmToday } from "@/modules/matters/scope";
 import {
   clearedLead,
   clientUser,
@@ -216,6 +232,65 @@ async function makeStaff(email: string): Promise<string> {
     role: "paralegal",
   })) as { userId: string };
   return r.userId;
+}
+
+// ------------------------------------------------------------ Phase 4 --
+
+async function ruleRow(key: string) {
+  await run(syncDeadlineRules, SYSTEM, {});
+  const [r] = await db().select().from(deadlineRules).where(eq(deadlineRules.key, key));
+  return r!;
+}
+
+async function verifiedRule(key: string) {
+  const r = await ruleRow(key);
+  if (!r.verifiedAt) {
+    await run(verifyDeadlineRule, asUser(owner), {
+      ruleId: r.id,
+      expectedHash: hashOfRow(r),
+      citation: "Checked for the fixture.",
+      attest: true,
+    });
+  }
+  return ruleRow(key);
+}
+
+async function manualDeadline(dueOn = "2031-03-03", ownerId: string | null = null) {
+  const m = await openTestMatter(owner);
+  const r = (await run(addDeadline, asUser(owner), {
+    matterId: m.matterId,
+    label: "Fixture deadline",
+    dueOn,
+    severity: "normal",
+    ownerId,
+  })) as { deadlineId: string };
+  return { ...m, deadlineId: r.deadlineId };
+}
+
+async function probateEvent() {
+  const m = await openTestMatter(owner, { practiceArea: "estate", matterType: "probate" });
+  const r = (await run(recordEvent, asUser(owner), {
+    matterId: m.matterId,
+    kind: "date_of_death",
+    occurredOn: "2025-04-01",
+  })) as { eventId: string };
+  return r.eventId;
+}
+
+async function csedDeadline(): Promise<string> {
+  await verifiedRule("tax.csed");
+  const m = await openTestMatter(owner, { matterType: "collections" });
+  await run(recordEvent, asUser(owner), {
+    matterId: m.matterId,
+    kind: "assessment_date",
+    occurredOn: "2021-02-01",
+  });
+  const [d] = await db().select().from(deadlines).where(eq(deadlines.matterId, m.matterId));
+  return d!.id;
+}
+
+async function collectionsMatter(): Promise<string> {
+  return (await openTestMatter(owner, { matterType: "collections" })).matterId;
 }
 
 const FIXTURES: Record<string, Fixture> = {
@@ -844,6 +919,218 @@ const FIXTURES: Record<string, Fixture> = {
     principal: () => asUser(owner),
     input: () => ({ template: "Dear {{clientName}}, please sign: {{signingUrl}}" }),
     expectAction: "firm.engagement_template.updated",
+  },
+  "deadlines.sync_rules": {
+    principal: () => SYSTEM,
+    input: () => ({}),
+    expectAction: "deadlines.rules_synced",
+  },
+  "deadlines.update_rule": {
+    principal: () => asUser(owner),
+    input: async () => {
+      const r = await ruleRow("estate.tx_inventory");
+      const amount = r.offset.unit === "annual" ? 90 : r.offset.amount + 1;
+      return {
+        ruleId: r.id,
+        expectedVersion: r.version,
+        label: r.label,
+        description: r.description,
+        offset: { unit: "days", amount },
+        rollForward: r.rollForward,
+        severity: r.severity,
+        noticeTypes: r.noticeTypes,
+        preferPrinted: r.preferPrinted,
+      };
+    },
+    expectAction: "deadlines.rule_updated",
+  },
+  "deadlines.verify_rule": {
+    principal: () => asUser(owner),
+    input: async () => {
+      const r = await ruleRow("estate.federal_estate_return");
+      return {
+        ruleId: r.id,
+        expectedHash: hashOfRow(r),
+        citation: "Checked for the fixture.",
+        attest: true,
+      };
+    },
+    expectAction: "deadlines.rule_verified",
+  },
+  "deadlines.revoke_rule_verification": {
+    principal: () => asUser(owner),
+    input: async () => ({
+      ruleId: (await verifiedRule("estate.tx_will_application")).id,
+      reason: "Re-checking the citation",
+    }),
+    expectAction: "deadlines.rule_verification_revoked",
+  },
+  "deadlines.set_rule_active": {
+    principal: () => asUser(owner),
+    input: async () => ({ ruleId: (await ruleRow("tax.oic_compliance")).id, active: false }),
+    expectAction: "deadlines.rule_switched_off",
+  },
+  "deadlines.add_holiday": {
+    principal: () => asUser(owner),
+    input: () => ({ date: "2031-01-02", label: "Fixture holiday" }),
+    expectAction: "deadlines.holiday_added",
+  },
+  "deadlines.add_federal_holidays": {
+    principal: () => asUser(owner),
+    input: () => ({ year: 2032 }),
+    expectAction: "deadlines.federal_holidays_added",
+  },
+  "deadlines.remove_holiday": {
+    principal: () => asUser(owner),
+    input: async () => {
+      await run(addHoliday, asUser(owner), { date: "2031-01-03", label: "Fixture holiday" });
+      return { date: "2031-01-03" };
+    },
+    expectAction: "deadlines.holiday_removed",
+  },
+  "deadlines.record_event": {
+    principal: () => asUser(owner),
+    input: async () => ({
+      matterId: (await openTestMatter(owner, { practiceArea: "estate", matterType: "probate" }))
+        .matterId,
+      kind: "date_of_death",
+      occurredOn: "2025-04-01",
+    }),
+    expectAction: "deadlines.event_recorded",
+  },
+  "deadlines.update_event": {
+    principal: () => asUser(owner),
+    input: async () => ({
+      eventId: await probateEvent(),
+      occurredOn: "2025-04-02",
+      noticeType: null,
+      flags: {},
+      note: null,
+    }),
+    expectAction: "deadlines.event_updated",
+  },
+  "deadlines.remove_event": {
+    principal: () => asUser(owner),
+    input: async () => ({ eventId: await probateEvent(), reason: "Wrong matter" }),
+    expectAction: "deadlines.event_removed",
+  },
+  "deadlines.add": {
+    principal: () => asUser(owner),
+    input: async () => ({
+      matterId: (await openTestMatter(owner)).matterId,
+      label: "Protest due",
+      dueOn: "2031-03-03",
+      severity: "high",
+      ownerId: owner.id,
+    }),
+    expectAction: "deadlines.added",
+  },
+  "deadlines.move": {
+    principal: () => asUser(owner),
+    input: async () => ({
+      deadlineId: (await manualDeadline()).deadlineId,
+      dueOn: "2031-03-04",
+      reason: "Agency granted an extension",
+    }),
+    expectAction: "deadlines.moved",
+  },
+  "deadlines.set_status": {
+    principal: () => asUser(owner),
+    input: async () => ({ deadlineId: (await manualDeadline()).deadlineId, status: "done" }),
+    expectAction: "deadlines.done",
+  },
+  "deadlines.assign": {
+    principal: () => asUser(owner),
+    input: async () => ({ deadlineId: (await manualDeadline()).deadlineId, ownerId: owner.id }),
+    expectAction: "deadlines.assigned",
+  },
+  "deadlines.acknowledge_alerts": {
+    principal: () => asUser(owner),
+    input: async () => {
+      const d = await manualDeadline(firmToday(), owner.id);
+      await run(runDeadlinesDaily, SYSTEM, { today: firmToday() });
+      return { deadlineId: d.deadlineId };
+    },
+    expectAction: "deadlines.alerts_acknowledged",
+  },
+  "deadlines.add_tolling": {
+    principal: () => asUser(owner),
+    input: async () => ({
+      deadlineId: await csedDeadline(),
+      days: 30,
+      reason: "Offer in compromise pending",
+      fromOn: null,
+      toOn: null,
+    }),
+    expectAction: "deadlines.tolling_added",
+  },
+  "deadlines.remove_tolling": {
+    principal: () => asUser(owner),
+    input: async () => {
+      const r = (await run(addTolling, asUser(owner), {
+        deadlineId: await csedDeadline(),
+        days: 10,
+        reason: "Bankruptcy stay",
+        fromOn: null,
+        toOn: null,
+      })) as { tollingId: string };
+      return { tollingId: r.tollingId };
+    },
+    expectAction: "deadlines.tolling_removed",
+  },
+  "deadlines.set_payment_plan": {
+    principal: () => asUser(owner),
+    input: async () => ({
+      matterId: await collectionsMatter(),
+      label: "Installment agreement",
+      firstDueOn: "2031-01-15",
+      dayOfMonth: 15,
+      amount: "$300.00",
+    }),
+    expectAction: "deadlines.payment_plan_set",
+  },
+  "deadlines.end_payment_plan": {
+    principal: () => asUser(owner),
+    input: async () => {
+      const matterId = await collectionsMatter();
+      await run(setPaymentPlan, asUser(owner), {
+        matterId,
+        label: "Installment agreement",
+        firstDueOn: "2031-01-15",
+        dayOfMonth: 15,
+        amount: null,
+      });
+      return { matterId, reason: "Paid in full" };
+    },
+    expectAction: "deadlines.payment_plan_ended",
+  },
+  "deadlines.run_daily": {
+    principal: () => SYSTEM,
+    input: () => ({}),
+    expectAction: "deadlines.daily_run",
+  },
+  "deadlines.escalate_alerts": {
+    principal: () => SYSTEM,
+    input: () => ({}),
+    expectAction: "deadlines.escalation_run",
+  },
+  "deadlines.run_audit": {
+    principal: () => SYSTEM,
+    input: () => ({}),
+    expectAction: "deadlines.audit_run",
+  },
+  "deadlines.create_calendar_feed": {
+    principal: () => asUser(owner),
+    input: () => ({}),
+    expectAction: "deadlines.calendar_feed_created",
+  },
+  "deadlines.revoke_calendar_feed": {
+    principal: () => asUser(owner),
+    input: async () => {
+      await run(createCalendarFeed, asUser(owner), {});
+      return {};
+    },
+    expectAction: "deadlines.calendar_feed_revoked",
   },
 };
 

@@ -1,3 +1,4 @@
+import { BUSINESS_DEADLINES } from "./deadlines";
 import { BUSINESS_MATTER_TYPES } from "./matters";
 import { dollars, type PracticeModule } from "../types";
 
@@ -77,6 +78,7 @@ export const business: PracticeModule = {
     return { urgency, value, fit: outOfState ? 15 : 25, notes };
   },
   matterTypes: BUSINESS_MATTER_TYPES,
+  deadlines: BUSINESS_DEADLINES,
   promptFragment: [
     "Business matters: collect who is involved and what they need, not the merits.",
     "Always get the names of every other party to a contract, dispute or deal: they are needed for the conflict check.",

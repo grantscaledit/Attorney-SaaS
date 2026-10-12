@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import type { DbOrTx } from "@/db/client";
 import { conflictChecks, metricsConsults, metricsLeadFacts } from "@/db/schema";
 
@@ -344,4 +344,105 @@ export async function pipelineMetrics(
       avgDaysInStage: Math.round(totalDays / g.matters),
     })),
   };
+}
+
+/*
+ * Deadlines panel (spec Section 9): deadlines in the next 7, 30 and 90 days
+ * by severity, unacknowledged alerts, matters with no deadline. Point in
+ * time, counted on the firm's date (rule 10). The top bar's "Deadlines in 7
+ * days" reads the same function. `scope` limits rows to the matters a person
+ * may see (null: all).
+ */
+export const DEADLINE_METRICS = {
+  next7: {
+    label: "Deadlines in 7 days",
+    definition:
+      "Open deadlines on open matters due within the next 7 days, including any already past due. Every date is advisory.",
+  },
+  next30: {
+    label: "Next 30 days",
+    definition:
+      "Open deadlines on open matters due within the next 30 days, including any past due.",
+  },
+  next90: {
+    label: "Next 90 days",
+    definition:
+      "Open deadlines on open matters due within the next 90 days, including any past due.",
+  },
+  overdue: {
+    label: "Past due",
+    definition: "Open deadlines whose date has passed and that nobody has marked done.",
+  },
+  unacknowledged: {
+    label: "Unacknowledged alerts",
+    definition:
+      "Open deadlines with a C2 alert (30, 14, 7, 3 or 1 days out, or on the day) that nobody has acknowledged.",
+  },
+  noDeadline: {
+    label: "Matters with no deadline",
+    definition: "Open matters with no open deadline (the C7 deadline audit).",
+  },
+} as const;
+
+export type DeadlineCounts = {
+  windows: Record<"7" | "30" | "90", Record<"critical" | "high" | "normal", number>>;
+  overdue: number;
+  unacknowledged: number;
+  noDeadline: number;
+};
+
+export async function deadlineCounts(
+  db: DbOrTx,
+  today: string,
+  scope: SQL | null,
+): Promise<DeadlineCounts> {
+  const where = scope ?? sql`true`;
+  const rows = (
+    await db.execute<{
+      severity: "critical" | "high" | "normal";
+      d7: number;
+      d30: number;
+      d90: number;
+      overdue: number;
+    }>(
+      sql`select d.severity,
+                 count(*) filter (where d.due_on <= ${today}::date + 7)::int as d7,
+                 count(*) filter (where d.due_on <= ${today}::date + 30)::int as d30,
+                 count(*) filter (where d.due_on <= ${today}::date + 90)::int as d90,
+                 count(*) filter (where d.due_on < ${today}::date)::int as overdue
+          from deadlines d join matters on matters.id = d.matter_id
+          where d.status = 'open' and matters.status = 'open' and matters.deleted_at is null and ${where}
+          group by d.severity`,
+    )
+  ).rows;
+  const [ack] = (
+    await db.execute<{ n: number }>(
+      sql`select count(distinct d.id)::int as n from deadline_alerts a
+          join deadlines d on d.id = a.deadline_id join matters on matters.id = d.matter_id
+          where a.acknowledged_at is null and d.status = 'open' and matters.status = 'open'
+            and matters.deleted_at is null and ${where}`,
+    )
+  ).rows;
+  const [none] = (
+    await db.execute<{ n: number }>(
+      sql`select count(*)::int as n from matters
+          where matters.status = 'open' and matters.deleted_at is null and ${where}
+            and not exists (select 1 from deadlines d where d.matter_id = matters.id and d.status = 'open')`,
+    )
+  ).rows;
+  const empty = () => ({ critical: 0, high: 0, normal: 0 });
+  const windows = { "7": empty(), "30": empty(), "90": empty() };
+  let overdue = 0;
+  for (const r of rows) {
+    windows["7"][r.severity] = r.d7;
+    windows["30"][r.severity] = r.d30;
+    windows["90"][r.severity] = r.d90;
+    overdue += r.overdue;
+  }
+  return { windows, overdue, unacknowledged: ack?.n ?? 0, noDeadline: none?.n ?? 0 };
+}
+
+export function windowTotal(c: DeadlineCounts, w: "7" | "30" | "90"): number {
+  const x = c.windows[w];
+  return x.critical + x.high + x.normal;
 }
