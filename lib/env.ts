@@ -50,6 +50,10 @@ export const envSchema = z
     /** Override for GHL's published webhook signing key (PEM), for key rotation. */
     GHL_WEBHOOK_PUBLIC_KEY: optionalString,
     ANTHROPIC_API_KEY: optionalString,
+    /** Model per tier (spec Section 2). Defaults in lib/ai/models.ts. */
+    MODEL_FAST: optionalString,
+    MODEL_STANDARD: optionalString,
+    MODEL_DEEP: optionalString,
     ALLOW_RAW_DOCUMENT_TO_LLM: booleanFromString,
     SENTRY_DSN: optionalString,
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),

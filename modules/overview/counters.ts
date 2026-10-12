@@ -1,5 +1,6 @@
 import "server-only";
 import { can, type Actor } from "@/lib/auth/can";
+import { pendingApprovalCount } from "@/modules/approvals/queries";
 import { unansweredLeadCount } from "@/modules/intake/queries";
 
 export type OpsCounter = {
@@ -19,15 +20,19 @@ export type OpsCounter = {
  */
 export async function loadOpsCounters(actor: Actor): Promise<OpsCounter[]> {
   const leadsVisible = can(actor, "leads.read");
-  const unanswered = leadsVisible ? await unansweredLeadCount(actor) : null;
+  const approvalsVisible = can(actor, "approvals.read");
+  const [unanswered, approvalsWaiting] = await Promise.all([
+    leadsVisible ? unansweredLeadCount(actor) : null,
+    approvalsVisible ? pendingApprovalCount(actor) : null,
+  ]);
   return [
     {
       key: "approvals",
       label: "Approvals waiting",
-      value: null,
-      href: null,
+      value: approvalsWaiting,
+      href: approvalsVisible ? "/approvals" : null,
       attention: true,
-      unavailableReason: "The approval queue opens with AI intake.",
+      unavailableReason: "Approvals are not part of your role.",
     },
     {
       key: "deadlines_7d",

@@ -60,6 +60,7 @@ pnpm lint && pnpm typecheck && pnpm format:check
 pnpm test:unit            # pure unit tests, no database
 pnpm test:integration     # needs DATABASE_URL pointing at a Postgres server (creates throwaway DBs)
 pnpm test:e2e             # Playwright; needs a built app and seeded database
+pnpm eval                 # live-model A3 evals; needs ANTHROPIC_API_KEY and Postgres
 pnpm db:generate          # new migration from schema changes (never hand-edit applied migrations)
 pnpm db:migrate           # apply migrations
 pnpm db:seed:demo         # demo firm (DEMO_MODE=true only)
@@ -83,3 +84,10 @@ pnpm provision-firm --help
   key, owner-approved template, consent, do-not-disturb and quiet hours. Never call
   `sendMessage` from anywhere else.
 - Metrics: read `modules/metrics/definitions.ts`; never re-derive a dashboard number elsewhere.
+- AI: call models only through `aiCall()` in `lib/ai/call.ts`, with a Zod schema and a prompt
+  version. Never call a model inside a transaction: run it in a job, then apply the result with a
+  command. Model text that is substantive goes to the approval queue (`createApproval()`), never
+  to the outbox directly; drafts to prospects pass `checkDraft()` and the classifier first.
+  Deterministic safety checks live in `lib/ai/guard.ts` with golden cases in
+  `modules/*/evals/`; add a case for every bug. Tests use `ScriptedTransport`; demo mode uses
+  `lib/ai/demo.ts` and never calls a live model. Design: ADR 0007.

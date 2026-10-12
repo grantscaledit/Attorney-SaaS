@@ -37,6 +37,8 @@ export class FakeGhl {
   opportunities: Record<string, unknown>[] = [];
   calendars: { id: string; name: string }[] = [];
   events = new Map<string, Record<string, unknown>[]>();
+  /** Free slots per calendar id: ISO datetimes with offset. */
+  freeSlots = new Map<string, string[]>();
   /** Next responses for POST /conversations/messages (status codes); default 200. */
   sendResponses: number[] = [];
   private sent = 0;
@@ -89,6 +91,14 @@ export class FakeGhl {
       return ok({ opportunities: this.opportunities, meta: { total: this.opportunities.length } });
     }
     if (u.pathname === "/calendars/") return ok({ calendars: this.calendars });
+    const free = u.pathname.match(/^\/calendars\/([^/]+)\/free-slots$/);
+    if (free && free[1]) {
+      const byDate: Record<string, { slots: string[] }> = {};
+      for (const s of this.freeSlots.get(free[1]) ?? []) {
+        (byDate[s.slice(0, 10)] ??= { slots: [] }).slots.push(s);
+      }
+      return ok({ ...byDate, traceId: "trace_1" });
+    }
     if (u.pathname === "/calendars/events") {
       return ok({ events: this.events.get(u.searchParams.get("calendarId") ?? "") ?? [] });
     }

@@ -1,5 +1,14 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, pgTable, smallint, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  check,
+  jsonb,
+  pgTable,
+  smallint,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 export const PRACTICE_AREAS = ["tax", "business", "estate"] as const;
 export type PracticeArea = (typeof PRACTICE_AREAS)[number];
@@ -33,6 +42,20 @@ export const firmSettings = pgTable(
     bookingUrl: text("booking_url"),
     /** Pre-consult intake form link sent with A7 confirmations. */
     intakeFormUrl: text("intake_form_url"),
+    /**
+     * A3 reply mode. "review_all": every assistant reply waits in the approval
+     * queue. "auto_send_safe": replies that pass every guard and only ask
+     * intake questions or offer times send automatically.
+     */
+    a3Mode: text("a3_mode", { enum: ["review_all", "auto_send_safe"] })
+      .notNull()
+      .default("review_all"),
+    /** GHL calendar whose free slots A3 offers. */
+    consultCalendarId: text("consult_calendar_id"),
+    /** Published fees the assistant may quote verbatim: [{ service, fee }]. */
+    feeTable: jsonb("fee_table")
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     ipAllowlist: text("ip_allowlist")
       .array()
       .notNull()

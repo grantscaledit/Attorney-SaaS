@@ -34,6 +34,8 @@ const EXPECTED: Record<Action, readonly Role[]> = {
   "leads.read": ["owner_attorney", "attorney", "paralegal", "intake"],
   "leads.write": ["owner_attorney", "attorney", "intake"],
   "conflicts.read": ["owner_attorney", "attorney", "paralegal", "intake"],
+  "conflicts.review": ["owner_attorney", "attorney"],
+  "leads.decline": ["owner_attorney", "attorney"],
   "matters.read": ["owner_attorney", "attorney", "paralegal", "client"],
   "matters.write": ["owner_attorney", "attorney", "paralegal"],
   "documents.read": ["owner_attorney", "attorney", "paralegal", "client"],

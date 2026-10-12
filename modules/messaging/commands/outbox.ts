@@ -1,8 +1,9 @@
 import { and, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
-import type { Tx } from "@/db/client";
+import type { DbOrTx, Tx } from "@/db/client";
 import {
   appointments,
+  approvals,
   automationRuns,
   consents,
   contacts,
@@ -24,6 +25,7 @@ import { isValidTimeZone, nextSendableTime } from "@/lib/messaging/quiet-hours";
 import {
   renderTemplate,
   templateDefinition,
+  type TemplateDefinition,
   type TemplateKey,
   type TemplateValues,
 } from "@/lib/messaging/templates";
@@ -53,10 +55,14 @@ export type SuppressionReason =
   | "missing_value"
   | "quiet_hours_window_passed"
   | "recent_text_back"
-  | "contact_deleted";
+  | "contact_deleted"
+  | "approval_withdrawn"
+  | "no_approved_text"
+  | "replied"
+  | "lead_closed";
 
 export type QueueSpec = {
-  automationId: "A1" | "A2" | "A7";
+  automationId: TemplateDefinition["automationId"];
   templateKey: TemplateKey;
   contact: ContactRow;
   leadId: string | null;
@@ -67,10 +73,15 @@ export type QueueSpec = {
   /** A2 texts need a recorded opt-in; A1 replies to the caller's own call. */
   requireSmsConsent?: boolean;
   values?: TemplateValues;
-  /** Pointers only: appointmentId, callId, cancelIfRebookedAfter. */
+  /**
+   * Pointers and send-time conditions: appointmentId, callId,
+   * cancelIfRebookedAfter, cancelIfReplyAfter, onlyWhileLeadStatus (comma list).
+   */
   context?: Record<string, string>;
   /** Caller already decided not to send (e.g. A1 repeat window); recorded like any suppression. */
   suppress?: SuppressionReason;
+  /** Staff alerts (A5) go to the firm's own people, not clients: quiet hours do not apply. */
+  ignoreQuietHours?: boolean;
 };
 
 export type QueueOutcome = {
@@ -101,10 +112,14 @@ async function latestConsent(tx: Tx, contactId: string, channel: "sms" | "email"
 async function channelBlock(
   tx: Tx,
   contact: ContactRow,
-  channel: "sms" | "email",
+  channel: "sms" | "email" | "chat",
   requireSmsConsent: boolean,
 ): Promise<SuppressionReason | null> {
   if (contact.deletedAt) return "contact_deleted";
+  if (channel === "chat") {
+    // A reply in the chat the person opened; only a blanket do-not-disturb stops it.
+    return contact.dnd ? "dnd" : null;
+  }
   if (channel === "sms") {
     if (contact.dnd || contact.dndSms) return "dnd";
     if (!contact.phone) return "no_phone";
@@ -159,7 +174,7 @@ export async function recordAutomationRun(
 }
 
 /** Whether an automation's feature flag is on (tier and firm override). */
-export async function automationEnabled(tx: Tx, automationId: string): Promise<boolean> {
+export async function automationEnabled(tx: DbOrTx, automationId: string): Promise<boolean> {
   const flag = `automation.${automationId}`;
   return isFeatureFlag(flag) && featureEnabledIn(tx, flag);
 }
@@ -214,7 +229,9 @@ export async function queueAutomatedMessage(tx: Tx, spec: QueueSpec): Promise<Qu
     }
   }
   if (!reason) {
-    scheduledFor = nextSendableTime(spec.dueAt, recipientTimeZone(spec.contact));
+    scheduledFor = spec.ignoreQuietHours
+      ? spec.dueAt
+      : nextSendableTime(spec.dueAt, recipientTimeZone(spec.contact));
     if (spec.notAfter && scheduledFor > spec.notAfter) reason = "quiet_hours_window_passed";
   }
 
@@ -289,6 +306,90 @@ export async function queueAutomatedMessage(tx: Tx, spec: QueueSpec): Promise<Qu
   };
 }
 
+/**
+ * Queues the text of an approved draft (spec Section 6). The person approved
+ * the words; do-not-disturb, consent and quiet hours still apply at queue and
+ * send time.
+ */
+export async function queueApprovedMessage(
+  tx: Tx,
+  spec: {
+    approvalId: string;
+    automationId: string;
+    channel: "sms" | "email" | "chat";
+    contact: ContactRow;
+    leadId: string | null;
+    subject: string | null;
+    body: string;
+    context?: Record<string, string>;
+  },
+): Promise<QueueOutcome> {
+  const idempotencyKey = `approval:${spec.approvalId}`;
+  const [existing] = await tx
+    .select()
+    .from(messages)
+    .where(eq(messages.idempotencyKey, idempotencyKey));
+  if (existing) {
+    return {
+      messageId: existing.id,
+      created: false,
+      status: existing.status,
+      scheduledFor: existing.scheduledFor,
+      audit: [],
+    };
+  }
+  let reason: string | null = await channelBlock(tx, spec.contact, spec.channel, false);
+  const now = new Date();
+  // Quiet hours are for texts and email; a chat reply answers someone who is on the site now.
+  const scheduledFor = reason
+    ? null
+    : spec.channel === "chat"
+      ? now
+      : nextSendableTime(now, recipientTimeZone(spec.contact));
+  if (!reason && !spec.body.trim()) reason = "empty_text";
+  const [row] = await tx
+    .insert(messages)
+    .values({
+      contactId: spec.contact.id,
+      leadId: spec.leadId,
+      direction: "outbound",
+      channel: spec.channel,
+      status: reason ? "suppressed" : "queued",
+      automationId: spec.automationId,
+      approvalId: spec.approvalId,
+      subject: spec.channel === "email" ? spec.subject : null,
+      body: spec.body,
+      idempotencyKey,
+      scheduledFor,
+      deferredFrom: scheduledFor && scheduledFor.getTime() !== now.getTime() ? now : null,
+      suppressedReason: reason,
+      context: { approvalId: spec.approvalId, ...(spec.context ?? {}) },
+    })
+    .returning();
+  if (!row) throw new Error("message insert returned no row");
+  return {
+    messageId: row.id,
+    created: true,
+    status: row.status,
+    scheduledFor: row.scheduledFor,
+    reason: reason ?? undefined,
+    audit: [
+      {
+        action: reason ? "messaging.suppressed" : "messaging.queued",
+        entityType: "message",
+        entityId: row.id,
+        after: {
+          automationId: spec.automationId,
+          approvalId: spec.approvalId,
+          channel: spec.channel,
+          reason,
+        },
+        metadata: { contactId: spec.contact.id, leadId: spec.leadId },
+      },
+    ],
+  };
+}
+
 /** Cancels queued messages that no longer apply (a rescheduled or cancelled consult). */
 export async function cancelQueued(tx: Tx, ids: string[], reason: string): Promise<AuditSpec[]> {
   if (ids.length === 0) return [];
@@ -355,7 +456,7 @@ export const claimMessage = defineCommand({
     }
 
     const [contact] = await ctx.tx.select().from(contacts).where(eq(contacts.id, m.contactId));
-    const channel = m.channel === "email" ? "email" : "sms";
+    const channel = m.channel === "email" ? "email" : m.channel === "chat" ? "chat" : "sms";
     let reason: string | null = null;
     if (!contact) reason = "contact_deleted";
     if (!reason && m.automationId && !(await automationEnabled(ctx.tx, m.automationId))) {
@@ -378,7 +479,40 @@ export const claimMessage = defineCommand({
       if (!tpl?.approvedAt) reason = "template_not_approved";
       else if (tpl.updatedAt > m.createdAt) reason = "template_changed";
     }
+    if (!reason && m.approvalId) {
+      const [a] = await ctx.tx
+        .select({ status: approvals.status })
+        .from(approvals)
+        .where(eq(approvals.id, m.approvalId));
+      if (a?.status !== "approved") reason = "approval_withdrawn";
+    }
+    // Rule 4: nothing sends automatically unless a person approved its text,
+    // as a template or as a reviewed draft.
+    if (!reason && !m.templateKey && !m.approvalId) reason = "no_approved_text";
     const ctxObj = (m.context ?? {}) as Record<string, string>;
+    if (!reason && ctxObj.cancelIfReplyAfter) {
+      const [reply] = await ctx.tx
+        .select({ id: messages.id })
+        .from(messages)
+        .where(
+          and(
+            eq(messages.contactId, m.contactId),
+            eq(messages.direction, "inbound"),
+            gt(messages.occurredAt, new Date(ctxObj.cancelIfReplyAfter)),
+          ),
+        )
+        .limit(1);
+      if (reply) reason = "replied";
+    }
+    // Nurture (A10) stops once the lead is retained or closed.
+    if (!reason && ctxObj.onlyWhileLeadStatus && m.leadId) {
+      const [lead] = await ctx.tx
+        .select({ status: leads.status })
+        .from(leads)
+        .where(eq(leads.id, m.leadId));
+      if (!lead || !ctxObj.onlyWhileLeadStatus.split(",").includes(lead.status))
+        reason = "lead_closed";
+    }
     if (!reason && ctxObj.cancelIfRebookedAfter && m.leadId) {
       const [rebooked] = await ctx.tx
         .select({ id: appointments.id })

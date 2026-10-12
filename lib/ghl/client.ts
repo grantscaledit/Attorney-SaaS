@@ -9,6 +9,7 @@ import {
   type GhlResource,
 } from "./endpoints";
 import {
+  freeSlotsResponse,
   getContactResponse,
   listCalendarsResponse,
   listContactsResponse,
@@ -294,6 +295,22 @@ export class GhlClient {
     return r.events;
   }
 
+  /** Open consultation times (ISO with offset), soonest first. Range at most 31 days. */
+  async getFreeSlots(
+    calendarId: string,
+    from: Date,
+    to: Date,
+    timezone: string,
+  ): Promise<string[]> {
+    return this.request({
+      resource: "calendars",
+      method: "GET",
+      path: GHL_PATHS.freeSlots(calendarId),
+      query: { startDate: from.getTime(), endDate: to.getTime(), timezone },
+      schema: freeSlotsResponse,
+    });
+  }
+
   /**
    * Sends an SMS or email to a contact through the firm's GHL number or
    * mailbox. VERIFY: the spec lists `subType` and `status` as required on this
@@ -301,12 +318,17 @@ export class GhlClient {
    */
   async sendMessage(
     input:
-      | { channel: "sms"; contactId: string; message: string }
+      | { channel: "sms" | "chat"; contactId: string; message: string }
       | { channel: "email"; contactId: string; subject: string; message: string; html: string },
   ): Promise<SendMessageResult> {
     const body =
-      input.channel === "sms"
-        ? { type: "SMS", contactId: input.contactId, message: input.message }
+      input.channel !== "email"
+        ? {
+            // "Live_Chat" is in the documented type enum; VERIFY delivery to the web chat widget.
+            type: input.channel === "sms" ? "SMS" : "Live_Chat",
+            contactId: input.contactId,
+            message: input.message,
+          }
         : {
             type: "Email",
             contactId: input.contactId,

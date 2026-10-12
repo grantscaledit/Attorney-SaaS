@@ -38,6 +38,10 @@ export const SUPPRESSION_LABELS: Record<string, string> = {
   recent_text_back: "Already texted in the last 24 hours",
   contact_deleted: "Contact deleted in GoHighLevel",
   rebooked: "Consult rebooked",
+  replied: "The person replied",
+  lead_closed: "Lead retained or closed",
+  approval_withdrawn: "Approval withdrawn",
+  no_approved_text: "No approved text",
 };
 
 export function suppressionLabel(reason: string | null): string {

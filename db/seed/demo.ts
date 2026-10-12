@@ -27,6 +27,7 @@ import { DEFAULT_AI_DISCLOSURE } from "@/modules/firm/schemas";
 import { acceptInvite } from "@/modules/users/commands/accept-invite";
 import { inviteUser } from "@/modules/users/commands/invite";
 import { runBootstrap } from "@/scripts/lib/firm-bootstrap";
+import { seedDemoAi } from "./demo-ai";
 import { seedDemoIntake } from "./demo-intake";
 import type { z } from "zod";
 
@@ -266,6 +267,12 @@ async function main(): Promise<void> {
   console.log("Seeding intake activity…");
   const intake = await seedDemoIntake(asOwner);
   console.log(`  ${intake.leads} synthetic enquiries processed through the webhook pipeline.`);
+
+  console.log("Seeding AI intake…");
+  const ai = await seedDemoAi(asOwner);
+  console.log(
+    `  ${ai.conversations} text conversations run through the intake assistant (demo model).`,
+  );
 
   await smokeTest(`scott@${DOMAIN}`);
 

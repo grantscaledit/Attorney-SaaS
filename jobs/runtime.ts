@@ -1,6 +1,8 @@
 import { PgBoss } from "pg-boss";
 import { setJobQueue, QUEUES, type JobQueue } from "@/lib/jobs/queue";
 import { log } from "@/lib/log";
+import { runA3 } from "./automations/A3";
+import { A8_CRON, INTAKE_DAILY_CRON, runA8, runIntakeDaily } from "./automations/followups";
 import { GHL_RECONCILE_CRON, reconcileGhl } from "./ghl/reconcile";
 import { processWebhookJob } from "./ghl/process-webhook";
 import { sendMessageJob } from "./messaging/send";
@@ -48,6 +50,9 @@ export async function startJobs(options: StartOptions): Promise<PgBoss> {
     QUEUES.ghlReconcile,
     QUEUES.messageSend,
     QUEUES.sweep,
+    QUEUES.A3,
+    QUEUES.A8,
+    QUEUES.intakeDaily,
   ];
   // Handlers never rely on pg-boss retries: webhooks and sends carry their own retry state.
   for (const q of queues) await boss.createQueue(q, { retryLimit: 0 });
@@ -57,6 +62,15 @@ export async function startJobs(options: StartOptions): Promise<PgBoss> {
   });
   await boss.work(QUEUES.messageSend, polling, async ([job]) => {
     if (job) await sendMessageJob(stringField(job.data, "messageId"));
+  });
+  await boss.work(QUEUES.A3, polling, async ([job]) => {
+    if (job) await runA3(stringField(job.data, "leadId"), stringField(job.data, "messageId"));
+  });
+  await boss.work(QUEUES.A8, async () => {
+    await runA8();
+  });
+  await boss.work(QUEUES.intakeDaily, async () => {
+    await runIntakeDaily();
   });
   await boss.work(QUEUES.ghlReconcile, async () => {
     await reconcileGhl();
@@ -73,6 +87,8 @@ export async function startJobs(options: StartOptions): Promise<PgBoss> {
     await boss.schedule(AUDIT_CHAIN_VERIFY, AUDIT_CHAIN_VERIFY_CRON, null, tz);
     await boss.schedule(QUEUES.ghlReconcile, GHL_RECONCILE_CRON, null, tz);
     await boss.schedule(QUEUES.sweep, SWEEP_CRON, null, tz);
+    await boss.schedule(QUEUES.A8, A8_CRON, null, tz);
+    await boss.schedule(QUEUES.intakeDaily, INTAKE_DAILY_CRON, null, tz);
   }
 
   const queue: JobQueue = {

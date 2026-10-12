@@ -4,7 +4,11 @@ import type { Route } from "next";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  CheckSquare,
   FileClock,
+  Handshake,
+  Sparkles,
+  ShieldAlert,
   Fingerprint,
   Inbox,
   Landmark,
@@ -20,6 +24,10 @@ import type { NavItem } from "@/lib/nav";
 const ICONS = {
   overview: LayoutGrid,
   intake: Inbox,
+  approvals: CheckSquare,
+  conflicts: ShieldAlert,
+  referrals: Handshake,
+  ai: Sparkles,
   audit: FileClock,
   firm: Landmark,
   users: Users,

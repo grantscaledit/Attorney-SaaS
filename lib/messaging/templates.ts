@@ -18,6 +18,8 @@ export const TEMPLATE_VARIABLES = {
   bookingUrl: "Booking page link (Settings > Integrations)",
   intakeFormUrl: "Pre-consult intake form link (Settings > Integrations)",
   appointmentTime: "Consult date and time in the recipient's time zone",
+  urgentReason: "Why an enquiry was flagged urgent (staff alerts only)",
+  leadUrl: "Link to the lead in LexDesk (staff alerts only)",
 } as const;
 
 export type TemplateVariable = keyof typeof TEMPLATE_VARIABLES;
@@ -25,7 +27,7 @@ export type TemplateValues = Partial<Record<TemplateVariable, string | null>>;
 
 export type TemplateDefinition = {
   key: string;
-  automationId: "A1" | "A2" | "A7";
+  automationId: "A1" | "A2" | "A3" | "A5" | "A7" | "A10";
   channel: Extract<MessageChannel, "sms" | "email">;
   label: string;
   /** When it sends, in plain words, for the approval screen. */
@@ -112,6 +114,68 @@ export const DEFAULT_TEMPLATES = [
     label: "No-show follow-up",
     when: "Two days after a no-show, unless a new consult has been booked.",
     body: `Hi {{firstName|there}}, {{firmName}} here. If you would still like to talk, you can book a consultation at {{bookingUrl}}. ${STOP}`,
+  },
+  {
+    key: "A3.handoff.sms",
+    automationId: "A3",
+    channel: "sms",
+    label: "Intake assistant hand-off",
+    when: "When a person asks for legal advice or for a person, or mentions an urgent situation (levy, garnishment, a deadline within 10 days, a recent death, a criminal investigation). The assistant stops and staff take over.",
+    body: "Thank you for telling us. I have passed this to our team and someone will contact you shortly. I cannot give legal advice by text. {{firmName}}",
+  },
+  {
+    key: "A5.urgent.sms",
+    automationId: "A5",
+    channel: "sms",
+    label: "Urgent enquiry alert to the attorney",
+    when: "To the assigned attorney's own phone (their GHL contact) when an enquiry scores urgent or escalates. Contains no client details.",
+    body: "LexDesk: urgent enquiry ({{urgentReason}}). Open it here: {{leadUrl}}",
+  },
+  {
+    key: "A10.day30.email",
+    automationId: "A10",
+    channel: "email",
+    label: "Nurture, 30 days after consult",
+    when: "30 days after a consult when the person has not retained the firm. Stops if they reply.",
+    subject: "Following up from {{firmName}}",
+    body: [
+      "Hi {{firstName|there}},",
+      "",
+      "Thank you again for meeting with {{firmName}}. If you would like to continue, or have questions about next steps, reply to this email or book a time here: {{bookingUrl}}",
+      "",
+      "{{firmName}}",
+      "{{firmPhone|}}",
+    ].join("\n"),
+  },
+  {
+    key: "A10.day60.email",
+    automationId: "A10",
+    channel: "email",
+    label: "Nurture, 60 days after consult",
+    when: "60 days after a consult, unless the person replied or retained the firm.",
+    subject: "Checking in from {{firmName}}",
+    body: [
+      "Hi {{firstName|there}},",
+      "",
+      "We wanted to check in. If your situation has changed or you are ready to move forward, we are glad to help. You can book a time here: {{bookingUrl}}",
+      "",
+      "{{firmName}}",
+    ].join("\n"),
+  },
+  {
+    key: "A10.day90.email",
+    automationId: "A10",
+    channel: "email",
+    label: "Nurture, 90 days after consult",
+    when: "90 days after a consult; the last message in the sequence.",
+    subject: "{{firmName}}",
+    body: [
+      "Hi {{firstName|there}},",
+      "",
+      "This is our last follow-up about your consultation. If we can help in the future, you can reach us at {{firmPhone|our office}} or book at {{bookingUrl}}.",
+      "",
+      "{{firmName}}",
+    ].join("\n"),
   },
 ] as const satisfies readonly TemplateDefinition[];
 

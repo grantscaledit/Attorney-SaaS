@@ -25,7 +25,13 @@ export const metadata: Metadata = { title: "GoHighLevel" };
 const AUTOMATION_NAMES: Record<string, string> = {
   A1: "A1 Missed-call text-back",
   A2: "A2 Instant lead response",
+  A3: "A3 AI intake assistant",
+  A5: "A5 Lead scoring and routing",
   A7: "A7 Consult booking and reminders",
+  A8: "A8 Pre-consult brief",
+  A10: "A10 Unconverted lead nurture",
+  A11: "A11 Non-engagement letter",
+  A12: "A12 Referral-out routing",
 };
 
 function Check({ ok, children }: { ok: boolean; children: string }) {

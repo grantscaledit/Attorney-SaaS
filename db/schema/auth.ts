@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -35,6 +36,13 @@ export const users = pgTable(
     role: userRole("role").notNull(),
     status: userStatus("status").notNull().default("active"),
     title: text("title"),
+    /** GHL contact that receives urgent-lead alerts for this person (A5). */
+    ghlContactId: text("ghl_contact_id"),
+    /** Practice areas this attorney takes, for Firm-tier routing (A5). */
+    practiceAreas: text("practice_areas")
+      .array()
+      .notNull()
+      .default(sql`'{}'`),
     twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
     ...timestamps,
     deletedAt: timestamp("deleted_at", { withTimezone: true }),

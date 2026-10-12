@@ -98,7 +98,11 @@ const PRACTICE = [
 
 type Kind = "missed_call" | "form" | "chat" | "email" | "answered_call";
 
-async function deliver(type: string, key: string, payload: Record<string, unknown>) {
+export async function deliver(
+  type: string,
+  key: string,
+  payload: Record<string, unknown>,
+): Promise<{ a3: { leadId: string; messageId: string }[] }> {
   const { eventId } = (await run(ingestGhlWebhook, SYSTEM, {
     dedupeKey: `demo:${key}`,
     eventType: type,
@@ -108,12 +112,14 @@ async function deliver(type: string, key: string, payload: Record<string, unknow
   })) as { eventId: string };
   const r = (await run(processGhlWebhook, SYSTEM, { eventId })) as {
     messages: { messageId: string; status: string; scheduledFor: Date | null }[];
+    a3: { leadId: string; messageId: string }[];
   };
   for (const m of r.messages) {
     if (m.status === "queued" && (!m.scheduledFor || m.scheduledFor <= new Date())) {
       await sendMessageJob(m.messageId);
     }
   }
+  return { a3: r.a3 };
 }
 
 export async function seedDemoIntake(owner: Principal): Promise<{ leads: number }> {

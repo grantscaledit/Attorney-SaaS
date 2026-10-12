@@ -6,6 +6,7 @@ import { QUEUES } from "@/lib/jobs/queue";
 import { log } from "@/lib/log";
 import { markStaleSend, STALE_SEND_MS } from "@/modules/messaging/commands/outbox";
 import { jobContext } from "../context";
+import { pendingA3, runA3 } from "../automations/A3";
 import { processWebhookJob } from "../ghl/process-webhook";
 import { sendMessageJob } from "../messaging/send";
 
@@ -18,7 +19,12 @@ const PENDING_GRACE_MS = 30_000;
 export const MAX_WEBHOOK_ATTEMPTS = 5;
 const BATCH = 50;
 
-export async function sweep(): Promise<{ webhooks: number; sends: number; stale: number }> {
+export async function sweep(): Promise<{
+  webhooks: number;
+  sends: number;
+  stale: number;
+  a3: number;
+}> {
   const db = getDb();
   const now = Date.now();
 
@@ -71,12 +77,21 @@ export async function sweep(): Promise<{ webhooks: number; sends: number; stale:
       (err: unknown) => log.error("could not mark stale send", { messageId: m.id, err }),
     );
   }
-  if (events.length + due.length + stale.length > 0) {
+  // A3 turns whose job was lost. One at a time: each calls a model.
+  const a3 = await pendingA3(5);
+  for (const t of a3) {
+    await runA3(t.leadId, t.messageId).catch((err: unknown) =>
+      log.error("sweep A3 failed", { messageId: t.messageId, err }),
+    );
+  }
+
+  if (events.length + due.length + stale.length + a3.length > 0) {
     log.info("sweep recovered work", {
       webhooks: events.length,
       sends: due.length,
       stale: stale.length,
+      a3: a3.length,
     });
   }
-  return { webhooks: events.length, sends: due.length, stale: stale.length };
+  return { webhooks: events.length, sends: due.length, stale: stale.length, a3: a3.length };
 }

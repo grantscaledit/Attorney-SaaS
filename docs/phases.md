@@ -3,11 +3,66 @@
 Spec Section 11. A phase closes only when its acceptance criteria pass, tests are green, the demo
 seed is updated and its runbook entry exists.
 
-| Phase                         | Status                                             |
-| ----------------------------- | -------------------------------------------------- |
-| 0. Foundation                 | Complete, pending review                           |
-| 1. GHL sync and intake basics | Complete, pending review and live GHL verification |
-| 2-8, V2                       | Not started                                        |
+| Phase                         | Status                                                        |
+| ----------------------------- | ------------------------------------------------------------- |
+| 0. Foundation                 | Complete, pending review                                      |
+| 1. GHL sync and intake basics | Complete, pending review and live GHL verification            |
+| 2. AI intake                  | Complete, pending review, attorney review and live model eval |
+| 3-8, V2                       | Not started                                                   |
+
+## Phase 2: AI intake
+
+Scope: AI layer, masking, approval queue, A3, A5, A6, A8, A10, A11, A12, evals. Design: ADR 0007.
+Setup: `docs/runbooks/ai-intake.md`.
+
+### Acceptance criteria and evidence
+
+| Criterion                                        | Evidence                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 20-case eval sets pass                           | Deterministic, every CI run: 26 advice-seeking, 22 escalation and 8 non-escalation messages, 22 unsafe and 10 safe drafts (`modules/intake/evals/guard.eval.test.ts`); 22 A3 routing cases (`a3.eval.test.ts`); 22 A6 cases against Postgres (`tests/integration/conflicts-eval.test.ts`). Live model: the 14 A3 cases that reach the model, with `pnpm eval` (needs `ANTHROPIC_API_KEY`; not yet run, see open items) |
+| Advice-seeking prompts are blocked and escalated | `tests/integration/ai-intake.test.ts`: an advice question hands off without a model call. The person gets only the approved hand-off text, an escalation waits in Approvals, and later messages do not restart the assistant. Drafts that give advice, or that the classifier flags, are blocked even in auto-send mode; a failed classifier counts as not safe                                                        |
+| Conflict hits surface for known test collisions  | 16 known collisions surface: exact, nickname, reordered, initial and surname, misspellings, business names with and without suffixes, and parties named in answers. 6 near misses stay clear. Checks never clear themselves; only a lawyer can clear one, with a note                                                                                                                                                  |
+
+### Also delivered
+
+- `lib/ai/call.ts` is the only model call path. It masks identifiers, uses structured output with
+  Zod, logs every call to `ai_runs` (hash, version, tokens, cost, reviewer), and records refusals
+  and invalid output.
+- The approval queue (Approvals) covers messages, letters, briefs, escalations and referrals.
+  Edits and reject reasons are kept. The outbox refuses to send text that no person approved
+  (rule 4).
+- A3 runs as a job after commit, with deterministic escalation first, then the draft guard and
+  classifier. Further details:
+  - firm-chosen review or safe auto-send;
+  - the disclosure goes in the first reply;
+  - consult slots come from GHL free slots;
+  - only the newest of quick messages is answered;
+  - the sweep recovers lost jobs.
+- A5 scoring and routing, with least-loaded routing on the Firm tier and an urgent SMS alert with
+  no client details.
+- A8 briefs carry the deadline notice; A10 nurture stops on reply or retention; A11 decline and
+  cold-lead letters; A12 referrals with tracking.
+- UI:
+  - lead page: intake record, score, conflict review, refer out, decline;
+  - Settings > AI intake, Conflict list and Referral partners;
+  - the Intake panel's "Conflict flags pending" metric.
+- Demo seed: six text conversations through the real A3 job with a rule-based model, plus
+  conflict parties, referral partners, a brief and a letter. Playwright:
+  `e2e/phase2.spec.ts` (the owner edits and approves a reply and clears a pre-screen; a paralegal
+  cannot clear or decline).
+
+### Open items and VERIFY
+
+- **Live model eval**: run `pnpm eval` with a key (or add the CI secret) and record the result here.
+- **Attorney review**:
+  - the A3 system prompt (`modules/intake/a3-prompt.ts`) and classifier;
+  - the A11 non-engagement letter and A12 referral wording (`modules/intake/followup-prompts.ts`);
+  - the five new templates;
+  - the urgency weights in the practice modules.
+- **VERIFY** in a staging sub-account (`docs/ghl/api-notes.md`):
+  - replies to web chat with `type: "Live_Chat"`;
+  - free slots honour the calendar's buffers and notice.
+- Escalation is broad by design ("no levy" escalates).
 
 ## Phase 1: GHL sync and intake basics
 
@@ -49,10 +104,9 @@ panel, A1, A2, A7, F1. Design: ADR 0006. Setup: `docs/runbooks/ghl-setup.md`.
 - **Attorney review**: the eight default message templates, the SMS consent wording on the form,
   and whether A1 (a reply to the person's own call) should be exempt from quiet hours. Today a
   missed call after 9pm is texted at 8am.
-- Conflict flags pending shows a dash until A6 (Phase 2). Practice area is set only from the web
-  form until A5 scoring (Phase 2).
+- ~~Conflict flags pending shows a dash until A6~~ (done in Phase 2).
 - Call recording consent per call (spec Section 4) is not stored yet; GHL announces recording.
-- Inbound message text is not stored (rule 6) until masking exists in Phase 2.
+- ~~Inbound message text is not stored until masking exists~~: stored masked since Phase 2.
 
 ## Phase 0: Foundation
 

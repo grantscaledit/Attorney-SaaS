@@ -102,6 +102,8 @@ export type ProcessResult = {
   status: GhlEvent["kind"] | "skipped";
   /** Messages the triggered automations queued, for the job to send. */
   messages: QueuedMessage[];
+  /** Inbound messages for the intake assistant, run by the job after commit. */
+  a3: { leadId: string; messageId: string }[];
 };
 
 /**
@@ -130,7 +132,7 @@ export const processGhlWebhook = defineCommand({
 
     if (event.status === "processed" || event.status === "ignored") {
       return {
-        result: { status: "skipped", messages: [] } as ProcessResult,
+        result: { status: "skipped", messages: [], a3: [] } as ProcessResult,
         audit: [
           {
             action: "ghl.webhook_already_processed",
@@ -151,7 +153,13 @@ export const processGhlWebhook = defineCommand({
     const mctx = await mirrorContext(ctx.tx, { webhookEventId: event.id });
     const outcome = await apply(mctx, normalized, enrichment);
     // A1, A2 and A7 decide in this same transaction, so no trigger is lost (ADR 0006).
-    const automations = await runTriggers(ctx.tx, outcome.triggers);
+    const automations = await runTriggers(
+      ctx.tx,
+      outcome.triggers.filter((t) => t.automation !== "A3"),
+    );
+    const a3 = outcome.triggers.flatMap((t) =>
+      t.automation === "A3" ? [{ leadId: t.leadId, messageId: t.messageId }] : [],
+    );
 
     const ignored = normalized.kind === "ignored";
     await ctx.tx
@@ -181,7 +189,7 @@ export const processGhlWebhook = defineCommand({
       ...outcome.audit,
       ...automations.audit,
     ];
-    const result: ProcessResult = { status: normalized.kind, messages: automations.messages };
+    const result: ProcessResult = { status: normalized.kind, messages: automations.messages, a3 };
     return { result, audit };
   },
 });

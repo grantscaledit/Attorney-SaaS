@@ -12,6 +12,10 @@ export type NavItem = {
   icon:
     | "overview"
     | "intake"
+    | "approvals"
+    | "conflicts"
+    | "referrals"
+    | "ai"
     | "audit"
     | "firm"
     | "users"
@@ -33,6 +37,7 @@ export const NAV: NavSection[] = [
     items: [
       { href: "/", label: "Overview", icon: "overview", permission: "dashboard.view" },
       { href: "/intake", label: "Intake", icon: "intake", permission: "leads.read", prefix: true },
+      { href: "/approvals", label: "Approvals", icon: "approvals", permission: "approvals.read" },
     ],
   },
   {
@@ -57,6 +62,24 @@ export const NAV: NavSection[] = [
         label: "GoHighLevel",
         icon: "integrations",
         permission: "firm.settings.update",
+      },
+      {
+        href: "/settings/ai",
+        label: "AI intake",
+        icon: "ai",
+        permission: "firm.settings.read",
+      },
+      {
+        href: "/settings/conflicts",
+        label: "Conflict list",
+        icon: "conflicts",
+        permission: "conflicts.read",
+      },
+      {
+        href: "/settings/referrals",
+        label: "Referral partners",
+        icon: "referrals",
+        permission: "firm.settings.read",
       },
       {
         href: "/settings/templates",

@@ -29,6 +29,20 @@
       "when": 1791654514892,
       "tag": "0003_intake_metric_views",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791677467808,
+      "tag": "0004_ai_intake",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791677468759,
+      "tag": "0005_conflict_trigram",
+      "breakpoints": true
     }
   ]
 }

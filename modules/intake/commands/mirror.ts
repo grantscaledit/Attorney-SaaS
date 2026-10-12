@@ -45,7 +45,9 @@ import {
 export type Trigger =
   | { automation: "A1"; callId: string; leadId: string; contactId: string }
   | { automation: "A2"; leadId: string; contactId: string }
-  | { automation: "A7"; appointmentId: string };
+  | { automation: "A7"; appointmentId: string }
+  /** Runs after commit: it calls a model (jobs/automations/A3.ts). */
+  | { automation: "A3"; leadId: string; messageId: string };
 
 export type MirrorContext = {
   tx: Tx;
@@ -652,6 +654,7 @@ export async function recordMessage(
     messageId: string | null;
     userId: string | null;
     occurredAt: Date;
+    body?: string | null;
   },
   enrichment: { contact: GhlContact | null },
 ): Promise<MirrorResult> {
@@ -712,6 +715,8 @@ export async function recordMessage(
       channel: m.channel,
       status: m.direction === "inbound" ? "received" : "observed",
       occurredAt: m.occurredAt,
+      // Masked at ingestion (lib/ghl/events.ts).
+      body: m.body ?? null,
       ghlMessageId: m.messageId,
       context: m.userId ? { ghlUserId: m.userId } : null,
     })
@@ -726,9 +731,19 @@ export async function recordMessage(
       metadata: ctx.cause,
     });
   }
-  // Chat and email enquiries get A2; a first text is for the AI intake assistant (A3, Phase 2).
+  // Chat and email enquiries get A2.
   if (createdLead && lead && (lead.channel === "chat" || lead.channel === "email")) {
     result.triggers.push({ automation: "A2", leadId: lead.id, contactId: contact.id });
+  }
+  // Inbound texts and chats from an open lead go to the intake assistant (A3).
+  if (
+    row &&
+    lead &&
+    m.direction === "inbound" &&
+    (m.channel === "sms" || m.channel === "chat") &&
+    m.body
+  ) {
+    result.triggers.push({ automation: "A3", leadId: lead.id, messageId: row.id });
   }
   return result;
 }

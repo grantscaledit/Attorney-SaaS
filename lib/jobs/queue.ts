@@ -13,7 +13,11 @@ export const QUEUES = {
   sweep: "system.sweep",
   A1: "automation.A1",
   A2: "automation.A2",
+  A3: "automation.A3",
   A7: "automation.A7",
+  A8: "automation.A8",
+  /** A10 nurture enrolment and A11 cold-lead letters. */
+  intakeDaily: "automation.intake_daily",
 } as const;
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];
