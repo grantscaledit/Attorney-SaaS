@@ -28,6 +28,7 @@ import { acceptInvite } from "@/modules/users/commands/accept-invite";
 import { inviteUser } from "@/modules/users/commands/invite";
 import { runBootstrap } from "@/scripts/lib/firm-bootstrap";
 import { seedDemoAi } from "./demo-ai";
+import { seedDemoDeadlines } from "./demo-deadlines";
 import { DEMO_CLIENT_EMAIL, seedDemoMatters } from "./demo-matters";
 import { seedDemoIntake } from "./demo-intake";
 import type { z } from "zod";
@@ -286,6 +287,12 @@ async function main(): Promise<void> {
   );
   await enrollDemoMfa(DEMO_CLIENT_EMAIL);
   console.log(`  ${seeded.matters} matters, with portal access for ${DEMO_CLIENT_EMAIL}.`);
+
+  console.log("Seeding deadlines…");
+  const dl = await seedDemoDeadlines(asOwner, seeded.ids);
+  console.log(
+    `  ${dl.deadlines} deadlines; ${dl.verified} rules marked verified for the demo only (citation says so).`,
+  );
 
   await smokeTest(`scott@${DOMAIN}`);
 

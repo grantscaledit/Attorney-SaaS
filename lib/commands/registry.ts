@@ -84,6 +84,36 @@ import {
   setTaskStatus,
 } from "@/modules/matters/commands/matters";
 import { applySummary } from "@/modules/matters/commands/summary";
+import {
+  escalateDeadlineAlerts,
+  runDeadlineAudit,
+  runDeadlinesDaily,
+} from "@/modules/deadlines/commands/automations";
+import { createCalendarFeed, revokeCalendarFeed } from "@/modules/deadlines/commands/calendar";
+import {
+  acknowledgeAlerts,
+  addDeadline,
+  addTolling,
+  assignDeadline,
+  endPaymentPlan,
+  moveDeadline,
+  recordEvent,
+  removeEvent,
+  removeTolling,
+  setDeadlineStatus,
+  setPaymentPlan,
+  updateEvent,
+} from "@/modules/deadlines/commands/deadlines";
+import {
+  addFederalHolidays,
+  addHoliday,
+  removeHoliday,
+  revokeRuleVerification,
+  setRuleActive,
+  syncDeadlineRules,
+  updateDeadlineRule,
+  verifyDeadlineRule,
+} from "@/modules/deadlines/commands/rules";
 import type { AnyCommand } from "./define";
 
 /**
@@ -165,4 +195,30 @@ export const COMMANDS = [
   chaseDocuments,
   flagStalled,
   updateEngagementTemplate,
+  // Phase 4: deadlines
+  syncDeadlineRules,
+  updateDeadlineRule,
+  verifyDeadlineRule,
+  revokeRuleVerification,
+  setRuleActive,
+  addHoliday,
+  addFederalHolidays,
+  removeHoliday,
+  recordEvent,
+  updateEvent,
+  removeEvent,
+  addDeadline,
+  moveDeadline,
+  setDeadlineStatus,
+  assignDeadline,
+  acknowledgeAlerts,
+  addTolling,
+  removeTolling,
+  setPaymentPlan,
+  endPaymentPlan,
+  runDeadlinesDaily,
+  escalateDeadlineAlerts,
+  runDeadlineAudit,
+  createCalendarFeed,
+  revokeCalendarFeed,
 ] as const satisfies readonly AnyCommand[];

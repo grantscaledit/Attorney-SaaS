@@ -30,7 +30,7 @@ import { scopeOf, stageLabel } from "./scope";
  */
 
 /** SQL condition limiting matters to what the actor may see, or null for all. */
-async function visibility(actor: Actor): Promise<SQL | null> {
+export async function matterVisibility(actor: Actor): Promise<SQL | null> {
   if (actor.role === "owner_attorney" || actor.role === "paralegal") return null;
   if (actor.role === "attorney") {
     return or(
@@ -97,7 +97,7 @@ export function stageFacts(
 export async function listMatters(actor: Actor, filters: MatterFilters): Promise<MatterListItem[]> {
   assertCan(actor, "matters.read");
   const where: SQL[] = [isNull(matters.deletedAt), eq(matters.status, filters.status)];
-  const vis = await visibility(actor);
+  const vis = await matterVisibility(actor);
   if (vis) where.push(vis);
   if (filters.practiceArea) where.push(eq(matters.practiceArea, filters.practiceArea));
   if (filters.stage) where.push(eq(matters.stage, filters.stage));
@@ -266,7 +266,7 @@ export type MatterDetail = NonNullable<Awaited<ReturnType<typeof matterDetail>>>
 /** A client's own matters. Nothing internal: no notes, tasks, drafts or unshared documents. */
 export async function portalMatters(actor: Actor) {
   assertCan(actor, "portal.access");
-  const vis = await visibility(actor);
+  const vis = await matterVisibility(actor);
   const rows = await getDb()
     .select()
     .from(matters)

@@ -1,3 +1,4 @@
+import { TAX_DEADLINES } from "./deadlines";
 import { TAX_MATTER_TYPES } from "./matters";
 import { daysUntil, dollars, yes, type PracticeModule } from "../types";
 
@@ -96,6 +97,7 @@ export const tax: PracticeModule = {
     return { urgency, value, fit, notes };
   },
   matterTypes: TAX_MATTER_TYPES,
+  deadlines: TAX_DEADLINES,
   promptFragment: [
     "Tax matters: ask for facts printed on the notice, not opinions about it.",
     "Never say whether the amount is right, whether penalties can be removed, or what the person should pay or file.",

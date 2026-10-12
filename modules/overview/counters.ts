@@ -1,6 +1,7 @@
 import "server-only";
 import { can, type Actor } from "@/lib/auth/can";
 import { pendingApprovalCount } from "@/modules/approvals/queries";
+import { deadlinesInSevenDays } from "@/modules/deadlines/queries";
 import { unansweredLeadCount } from "@/modules/intake/queries";
 
 export type OpsCounter = {
@@ -21,9 +22,11 @@ export type OpsCounter = {
 export async function loadOpsCounters(actor: Actor): Promise<OpsCounter[]> {
   const leadsVisible = can(actor, "leads.read");
   const approvalsVisible = can(actor, "approvals.read");
-  const [unanswered, approvalsWaiting] = await Promise.all([
+  const deadlinesVisible = can(actor, "deadlines.read");
+  const [unanswered, approvalsWaiting, deadlines7] = await Promise.all([
     leadsVisible ? unansweredLeadCount(actor) : null,
     approvalsVisible ? pendingApprovalCount(actor) : null,
+    deadlinesVisible ? deadlinesInSevenDays(actor) : null,
   ]);
   return [
     {
@@ -37,10 +40,10 @@ export async function loadOpsCounters(actor: Actor): Promise<OpsCounter[]> {
     {
       key: "deadlines_7d",
       label: "Deadlines in 7 days",
-      value: null,
-      href: null,
+      value: deadlines7,
+      href: deadlinesVisible ? "/deadlines" : null,
       attention: true,
-      unavailableReason: "Deadline tracking opens with the deadline engine.",
+      unavailableReason: "Deadlines are not part of your role.",
     },
     {
       key: "unanswered_leads",

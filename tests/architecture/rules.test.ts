@@ -75,7 +75,12 @@ describe("authorization: every entry point checks the session", () => {
   });
 
   it("every API route except auth, health and webhooks checks the session", () => {
-    const PUBLIC = new Set(["app/api/auth/[...all]/route.ts", "app/api/health/route.ts"]);
+    const PUBLIC = new Set([
+      "app/api/auth/[...all]/route.ts",
+      "app/api/health/route.ts",
+      // C6: calendar apps cannot sign in; the route checks its private token (next test).
+      "app/api/calendar/[token]/route.ts",
+    ]);
     const routes = source.filter(
       (f) =>
         /^app\/api\/.*route\.ts$/.test(rel(f)) &&
@@ -86,6 +91,13 @@ describe("authorization: every entry point checks the session", () => {
       .filter((f) => !/\brequire(Session|User|Permission|AnySession)\(/.test(read(f)))
       .map(rel);
     expect(unguarded).toEqual([]);
+  });
+
+  it("the calendar feed route authenticates its token through calendarFeedFor", () => {
+    const route = read(path.join(ROOT, "app/api/calendar/[token]/route.ts"));
+    expect(route).toMatch(/\bcalendarFeedFor\(/);
+    const query = read(path.join(ROOT, "modules/deadlines/queries.ts"));
+    expect(query).toMatch(/eq\(calendarFeeds\.tokenHash, feedTokenHash\(token\)\)/);
   });
 
   it("every webhook route authenticates the sender before doing anything", () => {

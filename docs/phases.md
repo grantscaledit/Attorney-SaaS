@@ -9,7 +9,52 @@ seed is updated and its runbook entry exists.
 | 1. GHL sync and intake basics | Complete, pending review and live GHL verification                 |
 | 2. AI intake                  | Complete, pending review, attorney review and live model eval      |
 | 3. Matters and documents      | Complete, pending review, attorney review and storage verification |
-| 4-8, V2                       | Not started                                                        |
+| 4. Deadlines                  | Complete, pending review and the rule verification session         |
+| 5-8, V2                       | Not started                                                        |
+
+## Phase 4: Deadlines
+
+Scope: rules engine, verification workflow, C1-C7, Deadlines panel. Design: ADR 0009. Setup and use:
+`docs/runbooks/deadlines.md`.
+
+### Acceptance criteria and evidence
+
+| Criterion                                                         | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unverified rules cannot fire                                      | `modules/deadlines/deadlines.test.ts`: every seed rule refuses to compute until verified; a rule edited after verification, switched off, or partly verified refuses too. `tests/integration/deadlines.test.ts`: a trigger event on an unverified rule records the event, computes nothing and gives the owner attorney a task; the database trigger rejects a rule-computed deadline from an unverified rule, and one computed from parameters other than those verified; only the owner attorney, as a person, can verify, and only the exact values shown; editing a verified rule stops it computing until it is verified again. `e2e/phase4.spec.ts` verifies a rule in the browser and sees the date appear |
+| Date math passes tests including weekends, month ends, leap years | `modules/deadlines/deadlines.test.ts` (date math and engine): day, month and year offsets across month and year ends, month-end clamping (31 January + 1 month), leap days (29 February + 1 and 4 years, 2100 not a leap year), daylight-saving dates, weekend and holiday roll-forward, annual dates, tolling, observed federal holidays. The integration tests repeat key cases through the database (9 months from 31 May to a Saturday 28 February, rolled to Monday)                                                                                                                                                                                                                                         |
+| Alerts escalate when unacknowledged                               | `tests/integration/deadlines.test.ts`: the daily job alerts at the point reached, once; texts the owner at 3 days with no client details; after 4 hours an unacknowledged critical alert goes to the owner attorney as an urgent task and a text, once; a 30-day alert never escalates; an acknowledged alert does not escalate; a done deadline stops alerting                                                                                                                                                                                                                                                                                                                                                   |
+
+### Also delivered
+
+- Seed rules from spec Section 8 in `practice/<area>/deadlines.ts`, loaded unverified at
+  provisioning; Settings > Deadline rules to edit, verify (citation and attestation), un-verify or
+  switch off rules, and the firm's holiday list (with a US federal holiday helper).
+- B3 to C1: the printed respond-by date becomes a deadline (unconfirmed until reviewed), the notice
+  date a trigger event; a verified rule cross-checks the printed date and a mismatch makes an urgent
+  task. Without a printed date the verified rule computes it.
+- C3 annual franchise tax report with a client reminder in the approval queue; C4 probate
+  milestones; C5 collection statute tolling and installment payment tracking; C6 private calendar
+  link (iCalendar feed); C7 weekly audit.
+- Deadlines panel: 7, 30 and 90 days by severity, past due, unacknowledged alerts, matters with no
+  deadline, month calendar, audit lists. Metric definitions in `modules/metrics`. The top bar's
+  "Deadlines in 7 days" is live.
+- Closing a matter cancels its open deadlines.
+- Demo seed: holidays, six rules marked verified for the demo only (the citation says no attorney
+  checked them), probate, formation, notice and collections matters with deadlines, alerts and a
+  payment plan.
+
+### Open items and VERIFY
+
+- **Attorney verification of every rule** (the onboarding session in the runbook), including the
+  notice numbers mapped to each rule, whether each date rolls off weekends and holidays, and the
+  firm's holiday list. Nothing computes until then.
+- **Calendar push**: V1 uses a subscription feed. A direct Google or Microsoft push needs an OAuth
+  app and endpoints verified against live documentation.
+- The C2 alert and escalation texts need their templates approved, and each attorney's alert phone
+  set as their GHL contact.
+- Earlier phases' open items still stand (live evals, storage verification, GHL verification,
+  attorney review of Phase 3 content).
 
 ## Phase 3: Matters and documents
 

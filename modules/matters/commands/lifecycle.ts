@@ -1,6 +1,14 @@
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
-import { checklistItems, contacts, documents, matters, questionnaires, tasks } from "@/db/schema";
+import {
+  checklistItems,
+  contacts,
+  deadlines,
+  documents,
+  matters,
+  questionnaires,
+  tasks,
+} from "@/db/schema";
 import type { AuditSpec } from "@/lib/commands/define";
 import { defineCommand } from "@/lib/commands/define";
 import { CommandError } from "@/lib/commands/errors";
@@ -80,7 +88,21 @@ export const closeMatter = defineCommand({
           inArray(tasks.automationId, ["B2", "B5", "B3"]),
         ),
       );
+    // Open deadlines close with the matter; their alerts stop (C2).
+    const closedDeadlines = await ctx.tx
+      .update(deadlines)
+      .set({ status: "cancelled", note: "matter closed", updatedAt: now })
+      .where(and(eq(deadlines.matterId, m.id), eq(deadlines.status, "open")))
+      .returning({ id: deadlines.id, dueOn: deadlines.dueOn });
     const audit: AuditSpec[] = [
+      ...closedDeadlines.map((d): AuditSpec => ({
+        action: "deadlines.cancelled",
+        entityType: "deadline",
+        entityId: d.id,
+        before: { status: "open", dueOn: d.dueOn },
+        after: { status: "cancelled" },
+        metadata: { reason: "matter closed", matterId: m.id },
+      })),
       {
         action: "matters.closed",
         entityType: "matter",

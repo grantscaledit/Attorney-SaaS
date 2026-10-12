@@ -99,9 +99,11 @@ async function uploadNotice(owner: Principal, matterId: string): Promise<string>
   return up.documentId;
 }
 
-export async function seedDemoMatters(
-  owner: Principal,
-): Promise<{ clientSetupUrl: string; matters: number }> {
+export async function seedDemoMatters(owner: Principal): Promise<{
+  clientSetupUrl: string;
+  matters: number;
+  ids: { estatePlan: string; notice: string; formation: string; probate: string };
+}> {
   if (!env().DEMO_MODE) throw new Error("demo matters seed requires DEMO_MODE=true");
   setJobQueue({ send: async () => {} });
   const db = getDb();
@@ -240,5 +242,14 @@ export async function seedDemoMatters(
       submit: false,
     },
   );
-  return { clientSetupUrl: signed.portal.setupUrl, matters: 5 };
+  return {
+    clientSetupUrl: signed.portal.setupUrl,
+    matters: 5,
+    ids: {
+      estatePlan: signed.matterId,
+      notice: notice.matterId,
+      formation: formation.matterId,
+      probate: probate.matterId,
+    },
+  };
 }

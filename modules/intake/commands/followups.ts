@@ -38,6 +38,7 @@ import {
   type LetterReason,
 } from "../followup-prompts";
 import type { QueuedMessage } from "./automations";
+import { DEADLINE_NOTICE } from "@/modules/deadlines/rules";
 
 /*
  * Intake follow-ups after the conversation (spec Section 7):
@@ -49,8 +50,8 @@ import type { QueuedMessage } from "./automations";
  * templates instead), so nothing here reaches a client without a person.
  */
 
-export const DEADLINE_NOTICE =
-  "Verify against the source document. The firm's calendar is the system of record.";
+// Rule 7's line lives with the deadline engine; re-exported for existing callers.
+export { DEADLINE_NOTICE };
 
 function dateIn(d: Date, timeZone: string): string {
   return new Intl.DateTimeFormat("en-US", { timeZone, dateStyle: "long" }).format(d);

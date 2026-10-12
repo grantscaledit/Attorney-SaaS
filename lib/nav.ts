@@ -25,7 +25,10 @@ export type NavItem = {
     | "features"
     | "integrations"
     | "templates"
-    | "security";
+    | "security"
+    | "deadlines"
+    | "rules"
+    | "calendar";
   permission: Action;
   flag?: FeatureFlag;
   /** Match nested routes as active. */
@@ -48,6 +51,12 @@ export const NAV: NavSection[] = [
         prefix: true,
       },
       { href: "/pipeline", label: "Pipeline", icon: "pipeline", permission: "matters.read" },
+      {
+        href: "/deadlines",
+        label: "Deadlines",
+        icon: "deadlines",
+        permission: "deadlines.read",
+      },
       { href: "/approvals", label: "Approvals", icon: "approvals", permission: "approvals.read" },
     ],
   },
@@ -87,6 +96,13 @@ export const NAV: NavSection[] = [
         permission: "firm.settings.read",
       },
       {
+        href: "/settings/deadline-rules",
+        label: "Deadline rules",
+        icon: "rules",
+        permission: "deadlines.read",
+        prefix: true,
+      },
+      {
         href: "/settings/conflicts",
         label: "Conflict list",
         icon: "conflicts",
@@ -114,6 +130,12 @@ export const NAV: NavSection[] = [
         label: "Sign-in and security",
         icon: "security",
         permission: "dashboard.view",
+      },
+      {
+        href: "/settings/calendar",
+        label: "Calendar link",
+        icon: "calendar",
+        permission: "deadlines.read",
       },
     ],
   },

@@ -1,3 +1,4 @@
+import { ESTATE_DEADLINES } from "./deadlines";
 import { ESTATE_MATTER_TYPES } from "./matters";
 import { daysUntil, dollars, yes, type PracticeModule } from "../types";
 
@@ -114,6 +115,7 @@ export const estate: PracticeModule = {
     return { urgency, value, fit, notes };
   },
   matterTypes: ESTATE_MATTER_TYPES,
+  deadlines: ESTATE_DEADLINES,
   promptFragment: [
     "Estate matters: be brief and kind; a recent death is hard to talk about.",
     "For probate, collect the name of the person who died and of the named executor: they are needed for the conflict check.",
